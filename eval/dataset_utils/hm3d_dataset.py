@@ -12,23 +12,51 @@ import json
 def load_hm3d_episodes(episodes: List[Episode], scene_data: Dict[str, SceneData], object_nav_path: str):
     i = 0
     files = listdir(object_nav_path)
+
+    ########
+    #TODO: Changed
+    ignore_scenes_path = os.path.join(object_nav_path, "ignore_scenes.txt")
+    with open(ignore_scenes_path, "r") as f:
+        ignore_scenes = f.readlines()
+
+    ignore_scenes = [name.strip() + ".json.gz" for name in ignore_scenes]
+    scenes_count = 0
+
+    ########
+
+
     files = sorted(files, key=str.casefold)
     for file in files:
         if file.endswith('.json.gz'):
+
+            ######
+            #TODO: Changed
+            if file in ignore_scenes:
+                print(f"Found Invalid Scene: {file}! Ignoring...")
+                continue
+
+            scenes_count += 1
+
+            ######
+
             with gzip.open(os.path.join(object_nav_path, file), 'r') as f:
                 json_data = json.load(f)
                 scene_id = json_data['episodes'][0]['scene_id']
+
+                #For a Scene ID, add objects and their locations
                 if scene_id not in scene_data:
-                    scene_data_ = SceneData(scene_id, {}, {})
-                    for obj_ in json_data['goals_by_category']:
+                    scene_data_ = SceneData(scene_id, {}, {})           #TODO: Gather individual scene info from here on
+                    for obj_ in json_data['goals_by_category']:         #TODO: Add objects by category into the scene
                         obj = json_data['goals_by_category'][obj_]
-                        obj_name = obj[0]['object_category']
+                        obj_name = obj[0]['object_category']            #TODO: Get Object Name or Category
                         scene_data_.object_locations[
                             obj_name] = []  # the actual locations and bounding boxes will be loaded later
                         scene_data_.object_ids[obj_name] = []
-                        for obj_loc in obj:
+                        for obj_loc in obj:                             #TODO: Add Object Locations
                             scene_data_.object_ids[obj_name].append(obj_loc['object_id'])
-                    scene_data[scene_id] = scene_data_
+                    scene_data[scene_id] = scene_data_                  #TODO: Add gathered scene info to scene_data
+                
+                #Define episodes for Scene: Each episode corresponds to a goal object category, start position and rotation
                 for ep in json_data['episodes']:
                     episode = Episode(ep['scene_id'],
                                       i,
@@ -38,6 +66,10 @@ def load_hm3d_episodes(episodes: List[Episode], scene_data: Dict[str, SceneData]
                                       ep['info']['geodesic_distance'])
                     episodes.append(episode)
                     i += 1
+
+    #####
+    print(f"\nLoaded {scenes_count} scenes and {i} episodes.")
+    #####
     return episodes, scene_data
 
 def load_hm3d_objects(scene_data: Dict[str, SceneData], semantic_objects, scene_id: str):

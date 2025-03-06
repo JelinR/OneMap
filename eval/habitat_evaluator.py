@@ -127,7 +127,7 @@ class HabitatEvaluator:
         if self.is_gibson:
             pass # TODO
         else:
-            backend_cfg.scene_dataset_config_file = self.scene_path + "hm3d/hm3d_annotated_basis.scene_dataset_config.json"
+            backend_cfg.scene_dataset_config_file = self.scene_path + "hm3d/hm3d_annotated_basis.scene_dataset_config.json" #TODO: Scene Dataset Config is loaded here
 
         hfov = 90
         rgb = habitat_sim.CameraSensorSpec()
@@ -151,15 +151,14 @@ class HabitatEvaluator:
         ))
         agent_cfg.sensor_specifications = [rgb, depth]
         sim_cfg = habitat_sim.Configuration(backend_cfg, [agent_cfg])
-        self.sim = habitat_sim.Simulator(sim_cfg)
+        self.sim = habitat_sim.Simulator(sim_cfg)                           #TODO: Sim is Loaded here
+
         if self.scene_data[scene_id].objects_loaded:
             return
         if not self.is_gibson:
             self.scene_data = HM3DDataset.load_hm3d_objects(self.scene_data, self.sim.semantic_scene.objects, scene_id)
         else:
             self.scene_data = GibsonDataset.load_gibson_objects(self.scene_data, self.dataset_info, scene_id)
-
-
 
     def execute_action(self, action: Dict
                        ):
@@ -194,7 +193,6 @@ class HabitatEvaluator:
             )
             self.sim.get_agent(0).set_state(agent_state)
             self.sim.step_physics(self.time_step)
-
 
     def read_results(self, path, sort_by):
         state_dir = os.path.join(path, 'state')
@@ -300,6 +298,14 @@ class HabitatEvaluator:
         success_per_obj = {}
         obj_count = {}
         results = []
+
+        #########
+        #TODO: Changed
+        # Closest_dist list to track the distance to the goal. The calculation is already done below.
+        dist_to_goal = {}
+
+        ########
+        
         # restart at 930
         for n_ep, episode in enumerate(self.episodes):
         # for n_ep, episode in enumerate(self.episodes[492:]):
@@ -371,8 +377,10 @@ class HabitatEvaluator:
 
                 if called_found:
                     # We will now compute the closest distance to the bounding box of the object
+                    #TODO: Gets Distance to Goal Object
                     dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
                                             self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                    
                     if dist < self.max_dist:
                         results[n_ep] = Result.SUCCESS
                         success += 1
@@ -398,10 +406,27 @@ class HabitatEvaluator:
                     #     self.actor.set_query(current_obj)
 
                 if steps % 100 == 0:
+                    #TODO: Calculates Distance to Goal Object
                     dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
                                             self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
                     print(f"Step {steps}, current object: {current_obj}, episode_id: {episode.episode_id}, distance to closest object: {dist}")
                 steps += 1
+
+            ##########
+
+            #TODO: Changed
+            #Add dist to evaluate
+            dist_to_goal[n_ep] = dist
+
+            #Save to file
+            save_path = os.path.join(self.results_path, f"dist_to_goals.txt")
+            with open(save_path, "a") as f:
+                f.write(f"{str(dist)}" + "\n")
+
+
+            ##########
+
+
             poses = np.array(poses)
             # If the last 10 poses didn't change much and we have OOT, assume stuck
             if results[n_ep] == Result.FAILURE_OOT and np.linalg.norm(poses[-1] - poses[-10]) < 0.05:
@@ -426,3 +451,11 @@ class HabitatEvaluator:
             # Write result to file
             with open(f"{self.results_path}/state/state_{episode.episode_id}.txt", 'w') as f:
                 f.write(str(results[n_ep].value))
+
+
+        ######
+        #TODO: Changed
+        save_dict = os.path.join(self.results_path, f"dist_to_goal.npy")
+        np.save(save_dict, dist_to_goal)
+
+        ######
