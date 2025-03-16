@@ -8,7 +8,7 @@ EvalConf:
   log_rerun: False
   use_pointnav: False
   square_im: True
-  
+
 config: [
   ./controller_habitat.yaml, # Default Habitat Controller
   ./mapping_conf_sim.yaml,       # Default Mapping Configuration

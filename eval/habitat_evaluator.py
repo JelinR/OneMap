@@ -370,7 +370,8 @@ class HabitatEvaluator:
                     # rr.log("camera/depth", rr.Image((observations["depth"] - observations["depth"].min()) / (
                     #         observations["depth"].max() - observations["depth"].min())))
                     self.logger.log_pos(cam_x, cam_y)
-                action, called_found = self.actor.act(observations)
+                    
+                action, called_found = self.actor.act(observations)     #TODO: Actor Action takes place here
                 self.execute_action(action)
                 if self.log_rerun:
                     self.logger.log_map()
