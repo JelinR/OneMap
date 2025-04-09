@@ -1,3 +1,4 @@
 # ignore all .pngs
 *.png
-weights/*
+weights/*depth_camera_filtering/
+yolov7/
