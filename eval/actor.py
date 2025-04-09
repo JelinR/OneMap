@@ -86,9 +86,14 @@ class MONActor(Actor):
         r = r.as_matrix()
         transformation_matrix = np.hstack((r, pos))
         transformation_matrix = np.vstack((transformation_matrix, np.array([0, 0, 0, 1])))
-        obj_found = self.mapper.add_data(observations["rgb"][:, :, :-1].transpose(2, 0, 1),
-                             observations["depth"].astype(np.float32),
-                             transformation_matrix)
+
+        #TODO: This is where the object detection occurs. Disabling this would mean not looking for the object
+        # obj_found = self.mapper.add_data(observations["rgb"][:, :, :-1].transpose(2, 0, 1),
+        #                      observations["depth"].astype(np.float32),
+        #                      transformation_matrix)
+
+        obj_found = False
+
         if self.init > 0:
             return_act['discrete'] = 'turn_left'
             self.init -= 1

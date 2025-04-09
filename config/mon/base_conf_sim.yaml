@@ -9,4 +9,4 @@ config: [
   ./controller_habitat.yaml, # Default Habitat Controller THIS ONE WILL BE USED
   ./mapping_conf_sim.yaml,       # Default Mapping Configuration
   ./planning_conf.yaml       # Default Planning Configuration
-]
+] 
