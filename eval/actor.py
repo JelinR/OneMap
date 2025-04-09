@@ -87,13 +87,12 @@ class MONActor(Actor):
         transformation_matrix = np.hstack((r, pos))
         transformation_matrix = np.vstack((transformation_matrix, np.array([0, 0, 0, 1])))
 
-        #TODO: This is where the object detection occurs. Disabling this would mean not looking for the object
-        # obj_found = self.mapper.add_data(observations["rgb"][:, :, :-1].transpose(2, 0, 1),
-        #                      observations["depth"].astype(np.float32),
-        #                      transformation_matrix)
-
-        obj_found = False
-
+        #TODO IMP: This is where One-Map is updated, and Object Detection takes place
+        obj_found = self.mapper.add_data(observations["rgb"][:, :, :-1].transpose(2, 0, 1),
+                             observations["depth"].astype(np.float32),
+                             transformation_matrix)
+        
+        #Initializes the agent in scene by turning 360 degrees
         if self.init > 0:
             return_act['discrete'] = 'turn_left'
             self.init -= 1

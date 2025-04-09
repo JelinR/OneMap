@@ -469,6 +469,7 @@ class Navigator:
 
             self.nav_goals = sorted(self.nav_goals, key=lambda x: x.get_score(), reverse=True)
 
+    #Updates One-Map and Detects Object
     def add_data(self,
                  image: np.ndarray,
                  depth: np.ndarray,
@@ -519,7 +520,7 @@ class Navigator:
         a = time.time()
         image_features = self.model.get_image_features(image[np.newaxis, ...]).squeeze(0)
         b = time.time()
-        self.one_map.update(image_features, depth, odometry, self.artificial_obstacles)
+        self.one_map.update(image_features, depth, odometry, self.artificial_obstacles)     #TODO IMP: Update One Map
         c = time.time()
         self.get_map(False)
         d = time.time()
