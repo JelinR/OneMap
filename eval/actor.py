@@ -7,12 +7,16 @@ import numpy as np
 
 # MON
 from vision_models.clip_dense import ClipModel
-from vision_models.yolo_world_detector import YOLOWorldDetector
-# from vision_models.grounding_dino_detector import GroundingDinoDetector
-# from vision_models.yolov8_model import YoloV8Detector
-# from vision_models.point_nav_policy import WrappedPointNavResNetPolicy
-# from vision_models.yolov6_model import YOLOV6Detector
-from vision_models.yolov7_model import YOLOv7Detector
+
+try:
+    from vision_models.yolo_world_detector import YOLOWorldDetector
+    # from vision_models.grounding_dino_detector import GroundingDinoDetector
+    # from vision_models.yolov8_model import YoloV8Detector
+    # from vision_models.point_nav_policy import WrappedPointNavResNetPolicy
+    # from vision_models.yolov6_model import YOLOV6Detector
+    from vision_models.yolov7_model import YOLOv7Detector
+except:
+    print(f"VISION MODELS ARE NOT LOADED.")
 
 from mapping import Navigator
 from planning import Planning, Controllers
@@ -51,7 +55,9 @@ class MONActor(Actor):
 
         self.mapper = Navigator(model, detector, config)
 
-        self.init = 36*2
+        #self.init = 36*2   #TODO Changed: The agent does not initialize by turning 360 degrees
+        self.init = -1
+
         hfov = 90 if self.square else 97
         res_x = 640
         res_y = 640 if self.square else 480
@@ -87,12 +93,14 @@ class MONActor(Actor):
         transformation_matrix = np.hstack((r, pos))
         transformation_matrix = np.vstack((transformation_matrix, np.array([0, 0, 0, 1])))
 
-        #TODO: This is where the object detection occurs. Disabling this would mean not looking for the object
-        # obj_found = self.mapper.add_data(observations["rgb"][:, :, :-1].transpose(2, 0, 1),
-        #                      observations["depth"].astype(np.float32),
-        #                      transformation_matrix)
+        #TODO Imp: This is where the OneMap feature map is updated. obj_found is made to always return False to signify no detections
+        obj_found = self.mapper.add_data(observations["rgb"][:, :, :-1].transpose(2, 0, 1),
+                             observations["depth"].astype(np.float32),
+                             transformation_matrix)
 
-        obj_found = False
+        #TODO Changed: Return Buffer action
+        return -1, False
+
 
         if self.init > 0:
             return_act['discrete'] = 'turn_left'

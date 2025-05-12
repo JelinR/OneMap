@@ -10,12 +10,14 @@ from mapping import (OneMap, detect_frontiers, get_frontier_midpoint,
                      Cluster, NavGoal, Frontier)
 
 from planning import Planning
-from vision_models.base_model import BaseModel
-from vision_models.yolo_world_detector import YOLOWorldDetector
 from onemap_utils import monochannel_to_inferno_rgb, log_map_rerun
 from config import Conf, load_config
 from config import SpotControllerConf
+
+from vision_models.base_model import BaseModel
+from vision_models.yolo_world_detector import YOLOWorldDetector
 from mobile_sam import sam_model_registry, SamPredictor
+
 
 # numpy
 import numpy as np
@@ -515,11 +517,13 @@ class Navigator:
         # Check if RGB or BGR correct?
         # TODO I think yolo wants rgb
         # detections = self.detector.detect(np.flip(image.transpose(1, 2, 0), axis=-1))
-        detections = self.detector.detect(image.transpose(1, 2, 0))
+
+        # detections = self.detector.detect(image.transpose(1, 2, 0))   #TODO Changed: No detections are run
+
         a = time.time()
         image_features = self.model.get_image_features(image[np.newaxis, ...]).squeeze(0)
         b = time.time()
-        self.one_map.update(image_features, depth, odometry, self.artificial_obstacles)
+        self.one_map.update(image_features, depth, odometry, self.artificial_obstacles)     #TODO Imp: Updates the feature map
         c = time.time()
         self.get_map(False)
         d = time.time()
@@ -531,6 +535,10 @@ class Navigator:
             self.one_map.confidence_map[px - 10:px + 10, py - 10:py + 10] += 10
             self.one_map.checked_conf_map[px - 10:px + 10, py - 10:py + 10] += 10
             self.first_obs = False
+
+
+        return False    #TODO Changed: No detections or other non-relevant code is run. This ensures only the feature map is updated
+    
         # if detections.class_id.shape[0] > 0:
         last_saw_left = self.saw_left
         last_saw_right = self.saw_right
