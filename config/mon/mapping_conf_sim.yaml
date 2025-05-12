@@ -1,7 +1,7 @@
 MappingConf: # [all in feature_map.py]
   n_points: 600  # Number of grid cells per dim
   size: 60 # in meters, size of the map per dim
-  agent_radius: 0.2  # in meters
+  agent_radius: 0.18 #0.2  # in meters                #TODO Changed
   blur_kernel_size: 0.05  # in meters 0.5 default
   obstacle_map_threshold: 0.4 # in occupancy value
   fully_explored_threshold: 0.2  #

@@ -1,13 +1,27 @@
 EvalConf:
   multi_object: false
-  max_steps: 1000
+  max_steps: 2000 #1000   #TODO Changed
   max_dist: 1.0
   is_gibson: False
-  object_nav_path: "datasets/objectnav_hm3d_v1/val/content/"    #TODO: Dataset Path (in ObjectNav)
-  scene_path: "datasets/scene_datasets/"                        #TODO: Scenes Path
-  log_rerun: False
+  #object_nav_path: "datasets/objectnav_hm3d_v1/val/content/"    #TODO: Dataset Path (in ObjectNav)
+  #scene_path: "datasets/scene_datasets/"                        #TODO: Scenes Path
+
+  #HM3D
+  # object_nav_path: "habitat-lab/data/datasets/objectnav/hm3d/v1/val/content/"
+  # scene_path: "habitat-lab/data/scene_datasets/"
+
+  #HSSD
+  is_hssd: True
+  object_nav_path: "habitat-lab/data/datasets/objectnav/hssd/val/content/"
+  scene_path: "habitat-lab/data/scene_datasets/hssd-hab/scenes"
+  # object_nav_path: "/mnt/vlfm_query_embed/habitat-lab/data/datasets/objectnav/hssd/val/content/"
+  # scene_path: "/mnt/vlfm_query_embed/habitat-lab/data/scene_datasets/hssd-hab/scenes/"
+
+  log_rerun: True #False
   use_pointnav: False
   square_im: True
+
+  saved_steps_dir: "saved_steps/hssd" #"saved_steps/hm3d"  #TODO Changed 
 
 config: [
   ./controller_habitat.yaml, # Default Habitat Controller

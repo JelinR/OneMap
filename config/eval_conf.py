@@ -10,6 +10,7 @@ class EvalConf:
     max_dist: float
     log_rerun: bool
     is_gibson: bool
+    is_hssd: bool                   #TODO Changed
     controller: HabitatControllerConf
     mapping: MappingConf
     planner: PlanningConf
@@ -17,6 +18,8 @@ class EvalConf:
     scene_path: str
     use_pointnav: bool
     square_im: bool
+
+    saved_steps_dir: str    #TODO Changed: Directory for saved steps navigation
 
 
 def load_eval_config():

@@ -55,6 +55,29 @@ import pickle
 # scipy
 from scipy.spatial.transform import Rotation as R
 
+#TODO Changed: OmegaConf
+from omegaconf import OmegaConf
+
+#TODO Changed
+# class TorchActionIDs:
+#     STOP = torch.tensor([[0]], dtype=torch.long)
+#     MOVE_FORWARD = torch.tensor([[1]], dtype=torch.long)
+#     TURN_LEFT = torch.tensor([[2]], dtype=torch.long)
+#     TURN_RIGHT = torch.tensor([[3]], dtype=torch.long)
+
+# class ActionIDs:
+#     stop = 0
+#     move_forward = 1
+#     turn_left = 2
+#     turn_right = 3
+
+Action_ID_to_str = {
+    0 : "stop",
+    1 : "move_forward",
+    2 : "turn_left",
+    3 : "turn_right" 
+}
+
 class Result(enum.Enum):
     SUCCESS = 1
     FAILURE_MISDETECT = 2
@@ -82,6 +105,9 @@ class HabitatEvaluator:
         self.episodes = []
         self.exclude_ids = []
         self.is_gibson = config.is_gibson
+
+        #TODO Changed
+        self.is_hssd = config.is_hssd
 
         self.sim = None
         self.actor = actor
@@ -117,15 +143,34 @@ class HabitatEvaluator:
                                                                                 self.object_nav_path)
         if self.actor is not None:
             self.logger = rerun_logger.RerunLogger(self.actor.mapper, False, "") if self.log_rerun else None
-        self.results_path = "/home/finn/active/MON/results_gibson" if self.is_gibson else "results/"
+        # self.results_path = "/home/finn/active/MON/results_gibson" if self.is_gibson else "results/"
+
+        #TODO Changed
+        self.results_path = "/mnt/OneMap/results/gibson" if self.is_gibson else "/mnt/OneMap/results/hm3d"
+        if self.is_hssd: 
+            self.results_path = "/mnt/OneMap/results/hssd"
+
+        self.saved_steps_dir = config.saved_steps_dir
+        self.saved_steps = None
 
     def load_scene(self, scene_id: str):
         if self.sim is not None:
             self.sim.close()
         backend_cfg = habitat_sim.SimulatorConfiguration()
-        backend_cfg.scene_id = self.scene_path + scene_id
+        # backend_cfg.scene_id = self.scene_path + scene_id
+        backend_cfg.scene_id = os.path.join(self.scene_path, scene_id)       #TODO Changed
+
+        #TODO Changed: Adeed extra args
+        ####
+        backend_cfg.allow_sliding = False
+        backend_cfg.pbr_image_based_lighting = True
+        ####
+
         if self.is_gibson:
             pass # TODO
+        elif self.is_hssd:
+            hssd_dir = os.path.dirname(self.scene_path)
+            backend_cfg.scene_dataset_config_file = os.path.join(hssd_dir, "hssd-hab.scene_dataset_config.json")
         else:
             backend_cfg.scene_dataset_config_file = self.scene_path + "hm3d/hm3d_annotated_basis.scene_dataset_config.json" #TODO: Scene Dataset Config is loaded here
 
@@ -144,14 +189,31 @@ class HabitatEvaluator:
         depth.sensor_type = habitat_sim.SensorType.DEPTH
         depth.position = np.array([0, 0.88, 0])
         depth.resolution = [res, res]
+
         agent_cfg = habitat_sim.agent.AgentConfiguration(action_space=dict(
             move_forward=ActionSpec("move_forward", ActuationSpec(amount=0.25)),
-            turn_left=ActionSpec("turn_left", ActuationSpec(amount=5.0)),
-            turn_right=ActionSpec("turn_right", ActuationSpec(amount=5.0)),
+            turn_left=ActionSpec("turn_left", ActuationSpec(amount=30.0)),          #TODO Changed: turn_left and turn_right
+            turn_right=ActionSpec("turn_right", ActuationSpec(amount=30.0)),
+            # turn_left=ActionSpec("turn_left", ActuationSpec(amount=5.0)),
+            # turn_right=ActionSpec("turn_right", ActuationSpec(amount=5.0)),
         ))
         agent_cfg.sensor_specifications = [rgb, depth]
         sim_cfg = habitat_sim.Configuration(backend_cfg, [agent_cfg])
         self.sim = habitat_sim.Simulator(sim_cfg)                           #TODO: Sim is Loaded here
+
+        #TODO Changed: Added navmesh settings
+        navmesh_settings = habitat_sim.NavMeshSettings()
+        navmesh_settings.set_defaults()
+        navmesh_settings.agent_height = 0.88
+        navmesh_settings.agent_radius = 0.18
+        # navmesh_settings.agent_max_climb = 0.2
+        # navmesh_settings.cell_height = 0.2
+        navmesh_settings.include_static_objects = True
+        navmesh_success = self.sim.recompute_navmesh(self.sim.pathfinder, navmesh_settings)
+        print(f"Navmesh Recomputed: {navmesh_success}")
+
+        print_hab_cfg(self.sim.config)
+
 
         if self.scene_data[scene_id].objects_loaded:
             return
@@ -302,13 +364,57 @@ class HabitatEvaluator:
         #########
         #TODO: Changed
         # Closest_dist list to track the distance to the goal. The calculation is already done below.
-        dist_to_goal = {}
+        # dist_to_goal = {}
 
         ########
         
         # restart at 930
         for n_ep, episode in enumerate(self.episodes):
         # for n_ep, episode in enumerate(self.episodes[492:]):
+
+            #####
+            #TODO Changed: Make sure that saved steps file exists for this scene and starting pose
+            scene_path = episode.scene_id
+            scene_id = scene_path.split("/")[-1].split(".")[0]
+            episode_id = episode.episode_id
+            start_pos, start_rot = episode.start_position, episode.start_rotation
+
+            print(f"\nNew Scene or Episode!\nScene ID: {scene_id}, Episode ID: {episode_id}, start_pos: {start_pos}, start_rot: {start_rot}")
+
+            scene_steps_files = [file for file in os.listdir(self.saved_steps_dir) if file.__contains__(scene_id)]
+            print(f"Scene Step Files: {len(scene_steps_files)}")
+            if len(scene_steps_files) == 0: 
+                print(f"No Files Found! Skipping...")
+                continue
+
+            for file in scene_steps_files:
+
+                file_path = os.path.join(self.saved_steps_dir, file)
+                step_actions = dict(np.load(file_path, allow_pickle=True))
+                print(f"Saved Start Pos: {step_actions['init_pos_abs']}, Saved Start Rot: {step_actions['init_rot_abs']}")
+                if (step_actions["init_pos_abs"] == start_pos).all() and (step_actions["init_rot_abs"] == start_rot).all():
+
+                    del step_actions['init_pos_abs']
+                    del step_actions['init_rot_abs']
+                    del step_actions['scene']
+                    del step_actions['episode']
+
+                    # step_actions = {int(k):torch.Tensor(v).to(dtype=torch.int64) for (k, v) in step_actions.items()}
+                    # step_actions = {int(k): int(v[0][0]) for (k, v) in step_actions.items()}
+                    step_actions = {int(k): Action_ID_to_str[ v[0][0] ] for (k, v) in step_actions.items()}
+
+                    print(f"Found Saved Steps for Scene : {scene_id}")
+                    skip_episode = False
+                    break
+                else:
+                    skip_episode = True
+
+            if skip_episode: 
+                print(f"Saved Step Actions not found for Scene: {scene_id}, Episode: {episode_id}. Skipping... ")
+                continue
+
+            #####
+
             poses = []
             results.append(Result.FAILURE_OOT)
             steps = 0
@@ -367,11 +473,20 @@ class HabitatEvaluator:
                     cam_x = -self.sim.get_agent(0).get_state().position[2]
                     cam_y = -self.sim.get_agent(0).get_state().position[0]
                     rr.log("camera/rgb", rr.Image(observations["rgb"]).compress(jpeg_quality=50))
-                    # rr.log("camera/depth", rr.Image((observations["depth"] - observations["depth"].min()) / (
-                    #         observations["depth"].max() - observations["depth"].min())))
+                    rr.log("camera/depth", rr.Image((observations["depth"] - observations["depth"].min()) / (
+                            observations["depth"].max() - observations["depth"].min())))
                     self.logger.log_pos(cam_x, cam_y)
                     
                 action, called_found = self.actor.act(observations)     #TODO: Actor Action takes place here
+
+                #TODO Changed: Action from saved steps actions
+                ####
+                action = {}
+                saved_action = step_actions[steps]
+                if saved_action == "stop": break
+                else: action["discrete"] = saved_action
+                ####
+                
                 self.execute_action(action)
                 if self.log_rerun:
                     self.logger.log_map()
@@ -416,13 +531,7 @@ class HabitatEvaluator:
             ##########
 
             #TODO: Changed
-            #Add dist to evaluate
-            dist_to_goal[n_ep] = dist
-
-            #Save to file
-            save_path = os.path.join(self.results_path, f"dist_to_goals.txt")
-            with open(save_path, "a") as f:
-                f.write(f"{str(dist)}" + "\n")
+            print(f"\n\n\n EPISODE DONE!! \n\n\n")
 
 
             ##########
@@ -430,33 +539,102 @@ class HabitatEvaluator:
 
             poses = np.array(poses)
             # If the last 10 poses didn't change much and we have OOT, assume stuck
-            if results[n_ep] == Result.FAILURE_OOT and np.linalg.norm(poses[-1] - poses[-10]) < 0.05:
-                results[n_ep] = Result.FAILURE_STUCK
+            #TODO Changed: Commented 
+            #########
+            # if results[n_ep] == Result.FAILURE_OOT and np.linalg.norm(poses[-1] - poses[-10]) < 0.05:
+            #     results[n_ep] = Result.FAILURE_STUCK
 
-            num_frontiers = len(self.actor.mapper.nav_goals)
-            np.savetxt(f"{self.results_path}/trajectories/poses_{episode.episode_id}.csv", poses, delimiter=",")
+            # num_frontiers = len(self.actor.mapper.nav_goals)
+            # save_path = f"{self.results_path}/trajectories/poses_{episode.episode_id}.csv"  #TODO OG Changed: Added save_path
+            # os.makedirs(os.path.dirname(save_path), exist_ok = True)
+            # np.savetxt(save_path, poses, delimiter=",")
+            #########
+
             # save final sim to image file
             final_sim = (self.actor.mapper.get_map() + 1.0) / 2.0
             final_sim = final_sim[0]
             final_sim = final_sim.transpose((1, 0))
             final_sim = np.flip(final_sim, axis=0)
             final_sim = monochannel_to_inferno_rgb(final_sim)
-            cv2.imwrite(f"{self.results_path}/similarities/final_sim_{episode.episode_id}.png", final_sim)
-            if (results[n_ep] == Result.FAILURE_STUCK or results[n_ep] == Result.FAILURE_OOT) and num_frontiers == 0:
-                results[n_ep] = Result.FAILURE_ALL_EXPLORED
-            print(f"Overall success: {success / (n_eps)}, per object: ")
-            for obj in success_per_obj.keys():
-                print(f"{obj}: {success_per_obj[obj] / obj_count[obj]}")
-            print(
-                f"Result distribution: successes: {results.count(Result.SUCCESS)}, misdetects: {results.count(Result.FAILURE_MISDETECT)}, OOT: {results.count(Result.FAILURE_OOT)}, stuck: {results.count(Result.FAILURE_STUCK)}, not reached: {results.count(Result.FAILURE_NOT_REACHED)}, all explored: {results.count(Result.FAILURE_ALL_EXPLORED)}")
-            # Write result to file
-            with open(f"{self.results_path}/state/state_{episode.episode_id}.txt", 'w') as f:
-                f.write(str(results[n_ep].value))
+            # save_path = f"{self.results_path}/similarities/final_sim_{episode.episode_id}.png"
+            save_path = f"{self.results_path}/similarities/final_sim_{scene_id}_{episode_id}.png"          #TODO Changed: Included scene info
+            os.makedirs(os.path.dirname(save_path), exist_ok = True)
+            
+            cv2.imwrite(save_path, final_sim)
+            print(f"Saved Image to {save_path}")
 
 
-        ######
-        #TODO: Changed
-        save_dict = os.path.join(self.results_path, f"dist_to_goal.npy")
-        np.save(save_dict, dist_to_goal)
+            #Save Feature Map
+            save_embed_path = f"{self.results_path}/embed_dicts/embed_dict_scene_{scene_id}.npz"
+            os.makedirs(os.path.dirname(save_embed_path), exist_ok = True)
 
-        ######
+            if os.path.exists(save_embed_path):
+                print(f"Saved Embed Dict found at : {save_embed_path}")
+            else:
+                np.savez(save_embed_path, arr=self.actor.mapper.one_map.feature_map)
+                print(f"Saved Embed Dict to : {save_embed_path}")
+
+
+            # break
+
+            #TODO Changed: Commented 
+            #########
+            # if (results[n_ep] == Result.FAILURE_STUCK or results[n_ep] == Result.FAILURE_OOT) and num_frontiers == 0:
+            #     results[n_ep] = Result.FAILURE_ALL_EXPLORED
+            # print(f"Overall success: {success / (n_eps)}, per object: ")
+            # for obj in success_per_obj.keys():
+            #     print(f"{obj}: {success_per_obj[obj] / obj_count[obj]}")
+            # print(
+            #     f"Result distribution: successes: {results.count(Result.SUCCESS)}, misdetects: {results.count(Result.FAILURE_MISDETECT)}, OOT: {results.count(Result.FAILURE_OOT)}, stuck: {results.count(Result.FAILURE_STUCK)}, not reached: {results.count(Result.FAILURE_NOT_REACHED)}, all explored: {results.count(Result.FAILURE_ALL_EXPLORED)}")
+            # # Write result to file
+            # with open(f"{self.results_path}/state/state_{episode.episode_id}.txt", 'w') as f:
+            #     f.write(str(results[n_ep].value))
+            ###########
+
+
+
+#TODO Changed: Utils for printing config
+print_yaml = lambda cfg: print(OmegaConf.to_yaml(cfg))
+
+def get_object_attrs(obj):
+    return [attr for attr in dir(obj) if not ((attr.startswith("__")) and (attr.endswith("__")))]
+
+
+def print_hab_cfg(hab_cfg):
+
+    cfg = {}
+
+    sim_cfg = hab_cfg.sim_cfg
+    agents_cfg = hab_cfg.agents
+
+    sim_attrs = get_object_attrs(sim_cfg)
+    cfg["sim_cfg"] = {}
+    for attr in sim_attrs:
+        cfg["sim_cfg"][attr] = sim_cfg.__getattribute__(attr)
+        
+    # print_yaml(cfg)
+    num_agents = len(agents_cfg)
+    for count in range(num_agents):
+        cfg[f"agent_{count}"] = {}
+
+        agent_cfg = agents_cfg[count]
+        agent_attrs = get_object_attrs(agent_cfg)
+        for attr in agent_attrs:
+
+            if attr == "sensor_specifications":
+                cfg[f"agent_{count}"]["sensors"] = {}
+                for sensor_cfg in agent_cfg.__getattribute__(attr):
+                    sensor_attrs = get_object_attrs(sensor_cfg)
+                    sensor_uuid = sensor_cfg.uuid
+                    cfg[f"agent_{count}"]["sensors"][sensor_uuid] = {}
+
+                    for sensor_attr in sensor_attrs:
+                        cfg[f"agent_{count}"]["sensors"][sensor_uuid][sensor_attr] = str(sensor_cfg.__getattribute__(sensor_attr))
+
+            else:
+                cfg[f"agent_{count}"][attr] = agent_cfg.__getattribute__(attr)
+
+    
+    print_yaml(cfg)
+
+    return cfg

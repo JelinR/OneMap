@@ -471,6 +471,7 @@ class Navigator:
 
             self.nav_goals = sorted(self.nav_goals, key=lambda x: x.get_score(), reverse=True)
 
+    #Updates One-Map and Detects Object
     def add_data(self,
                  image: np.ndarray,
                  depth: np.ndarray,
