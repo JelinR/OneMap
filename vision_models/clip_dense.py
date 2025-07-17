@@ -21,6 +21,8 @@ try:
 except:
     print("TensorRT not available, cannot use Jetson")
 
+from eval.scrape_img import load_images
+
 class ClipModel(torch.nn.Module, BaseModel):
     def __init__(self,
                  path: str,
@@ -87,6 +89,36 @@ class ClipModel(torch.nn.Module, BaseModel):
             return torch.einsum('bcx, bc -> bx', image_feats, text_feats)
         else:
             return torch.einsum('bchw, bc -> bhw', image_feats, text_feats)
+
+
+    def compute_multi_similarity(self,
+                                    image_feats: torch.Tensor,
+                                    text_feats: torch.Tensor,
+                                    text_query: str,
+                                    scrape_data_dir: str = "/mnt/vlfm_query_embed/data/scraped_imgs/hssd_15",
+                                    scrape_num: int = 15):
+        
+        #Shape: (1, H, W, C)
+        scraped_imgs = load_images(query = text_query,
+                                   num_images = scrape_num,
+                                   save_dir=scrape_data_dir)
+        
+        #Transform to BGR, and then permute shape to (B, C, H, W)
+        scraped_imgs = scraped_imgs[:, :, :, ::-1].permute(0, 3, 1, 2)
+
+        #Scraped Image feature vectors. Shape: (B, F) #TODO CONFIRM IF SHAPE IS RIGHT
+        scraped_img_feats = self.get_image_features(scraped_imgs).to(device = "cuda")
+        print(scraped_img_feats.shape)
+
+        #Concat text feature with scraped feats along the batch axis
+        scraped_img_feats = torch.cat((text_feats, scraped_img_feats), dim=0)
+
+        #Calculate the similarity grids for each feature vector
+        sim_grids = torch.einsum('bchw, bc -> bhw', image_feats, scraped_img_feats)
+
+        #Mean along the batch axis
+        return sim_grids.mean(dim=0, keepdim=True)
+        
 
     # def forward(self, images: np.ndarray):
     #    return self.image_forward_torch(images)

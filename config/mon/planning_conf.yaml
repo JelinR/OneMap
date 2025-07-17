@@ -13,3 +13,5 @@ PlanningConf:
   max_detect_distance: 0.8 # [in navigator.py]
   obstcl_kernel_size: 0.5 # [in navigator.py]
   min_goal_dist: 0.7 # [in navigator.py]
+
+  multi_prompt: False

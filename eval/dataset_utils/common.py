@@ -20,6 +20,13 @@ class SemanticObject:
             return self.object_id == other
         return False
 
+@dataclass
+class SemanticObject_Optional:
+    object_id: str
+    object_category: str
+    bbox: Optional = None
+    semantic_id: Optional = None
+    view_pts: Union[List, None] = None
 
 @dataclass
 class SceneData:

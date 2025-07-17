@@ -190,6 +190,9 @@ class Navigator:
         self.use_frontiers = config.planner.use_frontiers
         self.allow_far_plan = config.planner.allow_far_plan
 
+        #TODO: Added. Check for text-based or multi-based similarity generation
+        self.multi_prompt = config.planner.multi_prompt
+
         # For the closed-vocabulary object detector, not needed for OneMap
         self.class_map = {}
         self.class_map["chair"] = "chair"
@@ -420,7 +423,13 @@ class Navigator:
 
             for cluster in clusters:
                 # print(cluster)
-                cluster.compute_score(adjusted_score)
+
+                try:
+                    cluster.compute_score(adjusted_score)
+                except:
+                    print("Cluster Calculation failed. Breaking out of loop...")
+                    break
+
                 if len(self.blacklisted_nav_goals) == 0 or not np.any(
                         np.all(cluster.get_descr_point() == self.blacklisted_nav_goals, axis=1)):
                     if ((largest_contour is None or cv2.pointPolygonTest(largest_contour, cluster.center.astype(float),
@@ -428,6 +437,8 @@ class Navigator:
                         self.one_map.fully_explored_map[cluster.center[0], cluster.center[1]]) and \
                             (not self.one_map.checked_map[cluster.center[0], cluster.center[1]]):
                         self.nav_goals.append(cluster)
+
+            print(f"Broken out of loop. ")
             if self.log:
                 cluster_max_similarity = np.zeros_like(self.previous_sims[0])
 
@@ -704,7 +715,14 @@ class Navigator:
         else:
             map_features = map_features.permute(2, 0, 1).unsqueeze(0)
 
-        similarity = self.model.compute_similarity(map_features, self.query_text_features)
+        #TODO: Changed. Text similarity -> Multi (text+image) similarity
+        if self.multi_prompt:
+            similarity = self.model.compute_multi_similarity(image_feats = map_features, 
+                                                            text_feats = self.query_text_features,
+                                                            text_query = self.query_text)
+        else:
+            similarity = self.model.compute_similarity(map_features, self.query_text_features)  
+  
 
         if self.previous_sims is None:
             self.previous_sims = similarity

@@ -55,6 +55,8 @@ import pickle
 # scipy
 from scipy.spatial.transform import Rotation as R
 
+from time import time
+
 #TODO Changed: OmegaConf
 from omegaconf import OmegaConf
 
@@ -376,18 +378,44 @@ class HabitatEvaluator:
         results_dir = os.path.join(self.results_path, "state")
         os.makedirs(results_dir, exist_ok=True)
 
+        
+
         #get_scene_eps = lambda f: (f.split("_")[1], int(f.split("_")[2].split(".")[0]))
         get_scene_eps = lambda f: ("_".join( f.split("state_")[-1].split("_")[:-1] ), int( f.split("_")[-1].split(".txt")[0] ))
 
-        scene_eps_done = [get_scene_eps(f) for f in os.listdir(results_dir)]
+        # scene_eps_done = [get_scene_eps(f) for f in os.listdir(results_dir)]
+
+        ref_results_dir = os.path.join("results/hssd_onemap_temp", "state")
+        ref_poses_dir = os.path.join("results/hssd_onemap_temp", "trajectories")
+        scene_eps_done = []
+        scene_eps_all = []
+        for f in os.listdir(ref_results_dir):
+
+            scene_eps = get_scene_eps(f)
+            scene_eps_all.append(scene_eps)
+
+            pose_file = f"poses_{scene_eps[1]}.csv"
+            pose_file_path = os.path.join(ref_poses_dir, pose_file)
+            if os.path.exists(pose_file_path): scene_eps_done.append(scene_eps)
+
+
         print(f"Finished (Scene, Episode)s: {len(scene_eps_done)}\n{scene_eps_done}")
 
 
         #Update results with saved result values
-        for ep_num in range(len(scene_eps_done)):
+        # for ep_num in range(len(scene_eps_done)):
 
-            saved_scene, saved_episode = [elem for elem in scene_eps_done if elem[1] == ep_num][0]
-            state_path = os.path.join(results_dir, f"state_{saved_scene}_{saved_episode}.txt")
+        #     saved_scene, saved_episode = [elem for elem in scene_eps_done if elem[1] == ep_num][0]
+        #     state_path = os.path.join(results_dir, f"state_{saved_scene}_{saved_episode}.txt")
+        #     with open(state_path, "r") as f:
+        #         state_result = f.readlines()
+
+        #     results.append(int(state_result[0]))
+
+        for ep_num in range(len(os.listdir(ref_results_dir))):
+
+            saved_scene, saved_episode = [elem for elem in scene_eps_all if elem[1] == ep_num][0]
+            state_path = os.path.join(ref_results_dir, f"state_{saved_scene}_{saved_episode}.txt")
             with open(state_path, "r") as f:
                 state_result = f.readlines()
 
@@ -395,6 +423,12 @@ class HabitatEvaluator:
 
         print(f"Loaded Saved Results: {results}")
         ####
+
+        step_times = []
+        episode_times = []
+        step_time_path = f"{self.results_path}/timings/step_times.txt"
+        episode_time_path = f"{self.results_path}/timings/episode_times.txt"
+        os.makedirs(os.path.dirname(step_time_path), exist_ok=True)
 
         
         # restart at 930
@@ -405,9 +439,14 @@ class HabitatEvaluator:
             curr_eps = (episode.scene_id, episode.episode_id)
             print(f"Current (Scene, Episode): {curr_eps}")
 
+            # if curr_eps != ("102344094", 8):
+            #     print(f'{curr_eps} is not ("102344094", 8). Skipping...')
+            #     continue
+
             if curr_eps in scene_eps_done:
                 print(f"{curr_eps} already evaluated. Skipping...\n")
                 continue
+
             ###
 
 
@@ -454,203 +493,218 @@ class HabitatEvaluator:
 
             #####
 
-            try:
+            start_episode_time = time()
 
-                poses = []
-                results.append(Result.FAILURE_OOT)
-                steps = 0
-                if n_ep in self.exclude_ids:
-                    continue
-                n_eps += 1
-                if self.sim is None or not self.sim.curr_scene_name in episode.scene_id:
-                    self.load_scene(episode.scene_id)
-                # if self.is_gibson:
-                #     episode = self.compute_gt_path_gibson(episode)
-                self.sim.initialize_agent(0, habitat_sim.AgentState(episode.start_position, episode.start_rotation))
-                self.actor.reset()
-                current_obj_id = 0
-                current_obj = episode.obj_sequence[current_obj_id]
-                if current_obj not in success_per_obj:
-                    success_per_obj[current_obj] = 0
-                    obj_count[current_obj] = 1
-                else:
-                    obj_count[current_obj] += 1
-                self.actor.set_query(current_obj)
-                if self.log_rerun:
-                    pts = []
-                    for obj in self.scene_data[episode.scene_id].object_locations[current_obj]:
-                        if not self.is_gibson:
-                            pt = obj.bbox.center[[0, 2]]
-                            pt = (-pt[1], -pt[0])
-                            pts.append(self.actor.mapper.one_map.metric_to_px(*pt))
-                        else:
-                            for pt_ in obj:
-                                pt = (pt_[0], pt_[1])
-                                pts.append(self.actor.mapper.one_map.metric_to_px(*pt))
-                    pts = np.array(pts)
-                    rr.log("map/ground_truth", rr.Points2D(pts, colors=[[255, 255, 0]], radii=[1]))
-
-                while steps < self.max_steps and current_obj_id < len(episode.obj_sequence):
-                    observations = self.sim.get_sensor_observations()
-                    # observations['depth'] = fill_depth_holes(observations['depth'])
-                    observations['state'] = self.sim.get_agent(0).get_state()
-                    pose = np.zeros((4, ))
-                    pose[0] = -observations['state'].position[2]
-                    pose[1] = -observations['state'].position[0]
-                    pose[2] = observations['state'].position[1]
-                    # yaw
-                    orientation = observations['state'].rotation
-                    q0 = orientation.x
-                    q1 = orientation.y
-                    q2 = orientation.z
-                    q3 = orientation.w
-                    r = R.from_quat([q0, q1, q2, q3])
-                    # r to euler
-                    yaw, _, _1 = r.as_euler("yxz")
-                    pose[3] = yaw
-
-                    poses.append(pose)
-                    if self.log_rerun:
-                        cam_x = -self.sim.get_agent(0).get_state().position[2]
-                        cam_y = -self.sim.get_agent(0).get_state().position[0]
-                        rr.log("camera/rgb", rr.Image(observations["rgb"]).compress(jpeg_quality=50))
-                        rr.log("camera/depth", rr.Image((observations["depth"] - observations["depth"].min()) / (
-                                observations["depth"].max() - observations["depth"].min())))
-                        self.logger.log_pos(cam_x, cam_y)
-                        
-                    action, called_found = self.actor.act(observations)     #TODO: Actor Action takes place here
-
-                    #TODO Changed: Action from saved steps actions
-                    ####
-                    # action = {}
-                    # saved_action = step_actions[steps]
-                    # if saved_action == "stop": break
-                    # else: action["discrete"] = saved_action
-                    ####
-                    
-                    self.execute_action(action)
-                    if self.log_rerun:
-                        self.logger.log_map()
-                    
-                    #TODO: Added
-                    print(f"Step : {steps}, Action : {action}, Called Found: {called_found}")
-
-                    if called_found:
-                        # We will now compute the closest distance to the bounding box of the object
-                        #TODO: Gets Distance to Goal Object
-                        dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
-                                                self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
-                        
-                        if dist < self.max_dist:
-                            results[n_ep] = Result.SUCCESS
-                            success += 1
-                            print("Object found!")
-                            success_per_obj[current_obj] += 1
-                        else:
-                            pos = self.actor.mapper.chosen_detection
-                            pos_metric = self.actor.mapper.one_map.px_to_metric(pos[0], pos[1])
-                            dist_detect = get_closest_dist([-pos_metric[1], -pos_metric[0]],
-                                                self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
-                            if dist_detect < self.max_dist:
-                                results[n_ep] = Result.FAILURE_NOT_REACHED
-                            else:
-                                results[n_ep] = Result.FAILURE_MISDETECT
-                            print(f"Object not found! Dist {dist}, detect dist: {dist_detect}.")
-                        current_obj_id += 1
-                        # if current_obj_id < len(episode.obj_sequence):
-                        #     current_obj = episode.obj_sequence[current_obj_id]
-                        #     if current_obj not in success_per_obj:
-                        #         success_per_obj[current_obj] = 0
-                        #         obj_count[current_obj] = 1
-                        #         obj_count[current_obj] += 1
-                        #     self.actor.set_query(current_obj)
-
-                    if steps % 100 == 0:
-                        #TODO: Calculates Distance to Goal Object
-                        dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
-                                                self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
-                        print(f"Step {steps}, current object: {current_obj}, episode_id: {episode.episode_id}, distance to closest object: {dist}")
-                    steps += 1
-
-
-                poses = np.array(poses)
-                # If the last 10 poses didn't change much and we have OOT, assume stuck
-                #TODO Changed: Commented 
-                #########
-                if results[n_ep] == Result.FAILURE_OOT and np.linalg.norm(poses[-1] - poses[-10]) < 0.05:
-                    results[n_ep] = Result.FAILURE_STUCK
-
-                num_frontiers = len(self.actor.mapper.nav_goals)
-                save_path = f"{self.results_path}/trajectories/poses_{episode.episode_id}.csv"  #TODO OG Changed: Added save_path
-                os.makedirs(os.path.dirname(save_path), exist_ok = True)
-                np.savetxt(save_path, poses, delimiter=",")
-                #########
-
-                # save final sim to image file
-                final_sim = (self.actor.mapper.get_map() + 1.0) / 2.0
-                final_sim = final_sim[0]
-                final_sim = final_sim.transpose((1, 0))
-                final_sim = np.flip(final_sim, axis=0)
-                final_sim = monochannel_to_inferno_rgb(final_sim)
-                #save_path = f"{self.results_path}/similarities/final_sim_{episode.episode_id}.png"
-                save_path = f"{self.results_path}/similarities/final_sim_{episode.scene_id}_{episode.episode_id}.png"          #TODO Changed: Included scene info
-                os.makedirs(os.path.dirname(save_path), exist_ok = True)
-                
-                cv2.imwrite(save_path, final_sim)
-                print(f"Saved Image to {save_path}")
-
-
-                #TODO Changed: Save Feature Map
-                ####
-                # save_embed_path = f"{self.results_path}/feature_maps/feature_map_scene_{scene_id}.npz"
-                # os.makedirs(os.path.dirname(save_embed_path), exist_ok = True)
-
-                # if os.path.exists(save_embed_path):
-                #     print(f"Saved Feature Map found at : {save_embed_path}")
-                # else:
-                #     np.savez(save_embed_path, arr=self.actor.mapper.one_map.feature_map)
-                #     print(f"Saved Feature Map to : {save_embed_path}")
-                ####
-
-
-                # break
-
-                #TODO Changed: Commented 
-                #########
-                if (results[n_ep] == Result.FAILURE_STUCK or results[n_ep] == Result.FAILURE_OOT) and num_frontiers == 0:
-                    results[n_ep] = Result.FAILURE_ALL_EXPLORED
-                print(f"Overall success: {success / (n_eps)}, per object: ")
-                for obj in success_per_obj.keys():
-                    print(f"{obj}: {success_per_obj[obj] / obj_count[obj]}")
-                print(
-                    f"Result distribution: successes: {results.count(Result.SUCCESS)}, misdetects: {results.count(Result.FAILURE_MISDETECT)}, OOT: {results.count(Result.FAILURE_OOT)}, stuck: {results.count(Result.FAILURE_STUCK)}, not reached: {results.count(Result.FAILURE_NOT_REACHED)}, all explored: {results.count(Result.FAILURE_ALL_EXPLORED)}")
-                
-                # Write result to file
-                results_state_dir = os.path.join(self.results_path, "state")
-                os.makedirs(results_state_dir, exist_ok=True) 
-
-                with open(f"{results_state_dir}/state_{episode.scene_id}_{episode.episode_id}.txt", 'w') as f:
-                    f.write(str(results[n_ep].value))
-                ###########
-
-            except Exception as e:
-                print(f"Exception: {e}")
-
-                #Save scene, episode where error occured
-                exception_file_path = os.path.join(self.results_path, "errors.txt")
-                with open(exception_file_path, "w") as f:
-                    f.write(f"{episode.scene_id}, {episode.episode_id}")
-
-                #Update results with failure type as error
-                results[n_ep] = Result.FAILURE_ERROR
-
-                results_state_dir = os.path.join(self.results_path, "state")
-                os.makedirs(results_state_dir, exist_ok=True) 
-
-                with open(f"{results_state_dir}/state_{episode.scene_id}_{episode.episode_id}.txt", 'w') as f:
-                    f.write(str(results[n_ep].value))
-
+            poses = []
+            #results.append(Result.FAILURE_OOT)      #TODO COMMENTED: Need to uncomment
+            results[n_ep] = Result.FAILURE_OOT
+            steps = 0
+            if n_ep in self.exclude_ids:
                 continue
+            n_eps += 1
+            if self.sim is None or not self.sim.curr_scene_name in episode.scene_id:
+                self.load_scene(episode.scene_id)
+            # if self.is_gibson:
+            #     episode = self.compute_gt_path_gibson(episode)
+            self.sim.initialize_agent(0, habitat_sim.AgentState(episode.start_position, episode.start_rotation))
+            self.actor.reset()
+            current_obj_id = 0
+            current_obj = episode.obj_sequence[current_obj_id]
+            if current_obj not in success_per_obj:
+                success_per_obj[current_obj] = 0
+                obj_count[current_obj] = 1
+            else:
+                obj_count[current_obj] += 1
+            self.actor.set_query(current_obj)
+            if self.log_rerun:
+                pts = []
+                for obj in self.scene_data[episode.scene_id].object_locations[current_obj]:
+                    if not self.is_gibson:
+                        pt = obj.bbox.center[[0, 2]]
+                        pt = (-pt[1], -pt[0])
+                        pts.append(self.actor.mapper.one_map.metric_to_px(*pt))
+                    else:
+                        for pt_ in obj:
+                            pt = (pt_[0], pt_[1])
+                            pts.append(self.actor.mapper.one_map.metric_to_px(*pt))
+                pts = np.array(pts)
+                rr.log("map/ground_truth", rr.Points2D(pts, colors=[[255, 255, 0]], radii=[1]))
+
+            while steps < self.max_steps and current_obj_id < len(episode.obj_sequence):
+
+                start_step_time = time()
+
+                observations = self.sim.get_sensor_observations()
+                # observations['depth'] = fill_depth_holes(observations['depth'])
+                observations['state'] = self.sim.get_agent(0).get_state()
+                pose = np.zeros((4, ))
+                pose[0] = -observations['state'].position[2]
+                pose[1] = -observations['state'].position[0]
+                pose[2] = observations['state'].position[1]
+                # yaw
+                orientation = observations['state'].rotation
+                q0 = orientation.x
+                q1 = orientation.y
+                q2 = orientation.z
+                q3 = orientation.w
+                r = R.from_quat([q0, q1, q2, q3])
+                # r to euler
+                yaw, _, _1 = r.as_euler("yxz")
+                pose[3] = yaw
+
+                poses.append(pose)
+                if self.log_rerun:
+                    cam_x = -self.sim.get_agent(0).get_state().position[2]
+                    cam_y = -self.sim.get_agent(0).get_state().position[0]
+                    rr.log("camera/rgb", rr.Image(observations["rgb"]).compress(jpeg_quality=50))
+                    rr.log("camera/depth", rr.Image((observations["depth"] - observations["depth"].min()) / (
+                            observations["depth"].max() - observations["depth"].min())))
+                    self.logger.log_pos(cam_x, cam_y)
+                    
+                action, called_found = self.actor.act(observations)     #TODO: Actor Action takes place here
+
+                #TODO Changed: Action from saved steps actions
+                ####
+                # action = {}
+                # saved_action = step_actions[steps]
+                # if saved_action == "stop": break
+                # else: action["discrete"] = saved_action
+                ####
+                
+                self.execute_action(action)
+                if self.log_rerun:
+                    self.logger.log_map()
+                
+                #TODO: Added
+                print(f"Step : {steps}, Action : {action}, Called Found: {called_found}")
+
+                if called_found:
+                    # We will now compute the closest distance to the bounding box of the object
+                    #TODO: Gets Distance to Goal Object
+                    dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
+                                            self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                    
+                    if dist < self.max_dist:
+                        results[n_ep] = Result.SUCCESS
+                        success += 1
+                        print("Object found!")
+                        success_per_obj[current_obj] += 1
+                    else:
+                        pos = self.actor.mapper.chosen_detection
+                        pos_metric = self.actor.mapper.one_map.px_to_metric(pos[0], pos[1])
+                        dist_detect = get_closest_dist([-pos_metric[1], -pos_metric[0]],
+                                            self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                        if dist_detect < self.max_dist:
+                            results[n_ep] = Result.FAILURE_NOT_REACHED
+                        else:
+                            results[n_ep] = Result.FAILURE_MISDETECT
+                        print(f"Object not found! Dist {dist}, detect dist: {dist_detect}.")
+                    current_obj_id += 1
+                    # if current_obj_id < len(episode.obj_sequence):
+                    #     current_obj = episode.obj_sequence[current_obj_id]
+                    #     if current_obj not in success_per_obj:
+                    #         success_per_obj[current_obj] = 0
+                    #         obj_count[current_obj] = 1
+                    #         obj_count[current_obj] += 1
+                    #     self.actor.set_query(current_obj)
+
+                if steps % 100 == 0:
+                    #TODO: Calculates Distance to Goal Object
+                    dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
+                                            self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                    print(f"Step {steps}, current object: {current_obj}, episode_id: {episode.episode_id}, distance to closest object: {dist}")
+                steps += 1
+
+                finish_step_time = time()
+                step_time = finish_step_time - start_step_time
+                with open(step_time_path, "a") as f:
+                    f.write(f"{step_time}\n")
+
+
+
+            poses = np.array(poses)
+            # If the last 10 poses didn't change much and we have OOT, assume stuck
+            #TODO Changed: Commented 
+            #########
+            if results[n_ep] == Result.FAILURE_OOT and np.linalg.norm(poses[-1] - poses[-10]) < 0.05:
+                results[n_ep] = Result.FAILURE_STUCK
+
+            num_frontiers = len(self.actor.mapper.nav_goals)
+            save_path = f"{self.results_path}/trajectories/poses_{episode.episode_id}.csv"  #TODO OG Changed: Added save_path
+            os.makedirs(os.path.dirname(save_path), exist_ok = True)
+            np.savetxt(save_path, poses, delimiter=",")
+            #########
+
+            # save final sim to image file
+            final_sim = (self.actor.mapper.get_map() + 1.0) / 2.0
+            final_sim = final_sim[0]
+            final_sim = final_sim.transpose((1, 0))
+            final_sim = np.flip(final_sim, axis=0)
+            final_sim = monochannel_to_inferno_rgb(final_sim)
+            #save_path = f"{self.results_path}/similarities/final_sim_{episode.episode_id}.png"
+            save_path = f"{self.results_path}/similarities/final_sim_{episode.scene_id}_{episode.episode_id}.png"          #TODO Changed: Included scene info
+            os.makedirs(os.path.dirname(save_path), exist_ok = True)
+            
+            cv2.imwrite(save_path, final_sim)
+            print(f"Saved Image to {save_path}")
+
+
+            #TODO Changed: Save Feature Map
+            ####
+            # save_embed_path = f"{self.results_path}/feature_maps/feature_map_scene_{scene_id}.npz"
+            # os.makedirs(os.path.dirname(save_embed_path), exist_ok = True)
+
+            # if os.path.exists(save_embed_path):
+            #     print(f"Saved Feature Map found at : {save_embed_path}")
+            # else:
+            #     np.savez(save_embed_path, arr=self.actor.mapper.one_map.feature_map)
+            #     print(f"Saved Feature Map to : {save_embed_path}")
+            ####
+
+
+            # break
+
+            #TODO Changed: Commented 
+            #########
+            if (results[n_ep] == Result.FAILURE_STUCK or results[n_ep] == Result.FAILURE_OOT) and num_frontiers == 0:
+                results[n_ep] = Result.FAILURE_ALL_EXPLORED
+            print(f"Overall success: {success / (n_eps)}, per object: ")
+            for obj in success_per_obj.keys():
+                print(f"{obj}: {success_per_obj[obj] / obj_count[obj]}")
+            print(
+                f"Result distribution: successes: {results.count(Result.SUCCESS)}, misdetects: {results.count(Result.FAILURE_MISDETECT)}, OOT: {results.count(Result.FAILURE_OOT)}, stuck: {results.count(Result.FAILURE_STUCK)}, not reached: {results.count(Result.FAILURE_NOT_REACHED)}, all explored: {results.count(Result.FAILURE_ALL_EXPLORED)}")
+            
+            # Write result to file
+            results_state_dir = os.path.join(self.results_path, "state")
+            os.makedirs(results_state_dir, exist_ok=True) 
+
+            with open(f"{results_state_dir}/state_{episode.scene_id}_{episode.episode_id}.txt", 'w') as f:
+                f.write(str(results[n_ep].value))
+            ###########
+
+            finish_episode_time = time()
+            episode_time = finish_episode_time - start_episode_time
+            with open(episode_time_path, "a") as f:
+                f.write(f"{episode_time}\n")
+
+            # except Exception as e:
+            #     print(f"Exception: {e}")
+
+            #     #Save scene, episode where error occured
+            #     exception_file_path = os.path.join(self.results_path, "errors.txt")
+            #     with open(exception_file_path, "w") as f:
+            #         f.write(f"{episode.scene_id}, {episode.episode_id}")
+
+            #     #Update results with failure type as error
+            #     results[n_ep] = Result.FAILURE_ERROR
+
+            #     results_state_dir = os.path.join(self.results_path, "state")
+            #     os.makedirs(results_state_dir, exist_ok=True) 
+
+            #     with open(f"{results_state_dir}/state_{episode.scene_id}_{episode.episode_id}.txt", 'w') as f:
+            #         f.write(str(results[n_ep].value))
+
+            #     continue
 
 
 

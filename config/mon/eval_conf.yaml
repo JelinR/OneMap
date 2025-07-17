@@ -20,7 +20,7 @@ EvalConf:
 
   is_trial: False
 
-  log_rerun: True #False
+  log_rerun: False
   use_pointnav: False
   square_im: True
 
