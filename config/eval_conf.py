@@ -11,6 +11,7 @@ class EvalConf:
     log_rerun: bool
     is_gibson: bool
     is_hssd: bool                   #TODO Changed
+    is_trial: bool                  #TODO Changed
     controller: HabitatControllerConf
     mapping: MappingConf
     planner: PlanningConf

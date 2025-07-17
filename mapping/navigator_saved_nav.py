@@ -417,9 +417,7 @@ class Navigator:
             clusters = cluster_high_similarity_regions(normalized_map,
                                                        (self.one_map.confidence_map > 0.0).cpu().numpy())
             # clusters = cluster_high_similarity_regions(normalized_map, map_def > 0.0)
-
             for cluster in clusters:
-                # print(cluster)
                 cluster.compute_score(adjusted_score)
                 if len(self.blacklisted_nav_goals) == 0 or not np.any(
                         np.all(cluster.get_descr_point() == self.blacklisted_nav_goals, axis=1)):
@@ -521,7 +519,7 @@ class Navigator:
         # TODO I think yolo wants rgb
         # detections = self.detector.detect(np.flip(image.transpose(1, 2, 0), axis=-1))
 
-        detections = self.detector.detect(image.transpose(1, 2, 0))   #TODO Changed: No detections are run
+        #detections = self.detector.detect(image.transpose(1, 2, 0))   #TODO Changed: No detections are run
 
         a = time.time()
         image_features = self.model.get_image_features(image[np.newaxis, ...]).squeeze(0)
@@ -540,7 +538,7 @@ class Navigator:
             self.first_obs = False
 
 
-        #return False    #TODO Changed: No detections or other non-relevant code is run. This ensures only the feature map is updated
+        return False    #TODO Changed: No detections or other non-relevant code is run. This ensures only the feature map is updated
     
         # if detections.class_id.shape[0] > 0:
         last_saw_left = self.saw_left

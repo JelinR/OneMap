@@ -15,13 +15,18 @@ def load_hm3d_episodes(episodes: List[Episode], scene_data: Dict[str, SceneData]
 
     ########
     #TODO: Changed
-    # ignore_scenes_path = os.path.join(object_nav_path, "ignore_scenes.txt")
-    # with open(ignore_scenes_path, "r") as f:
-    #     ignore_scenes = f.readlines()
 
-    # ignore_scenes = [name.strip() + ".json.gz" for name in ignore_scenes]
-    # scenes_count = 0
+    #Ignore Scenes that are tough to explore
+    ignore_scenes_path = os.path.join(os.path.dirname(object_nav_path[:-1]), "ignore_scenes.txt")
+    print(ignore_scenes_path)
+    with open(ignore_scenes_path, "r") as f:
+        ignore_scenes = f.readlines()
 
+    ignore_scenes = [name.strip() + ".json.gz" for name in ignore_scenes]
+    scenes_count = 0
+
+    #Track Scenes and Episodes that are completed
+    
     ########
 
 
@@ -31,11 +36,11 @@ def load_hm3d_episodes(episodes: List[Episode], scene_data: Dict[str, SceneData]
 
             ######
             #TODO: Changed
-            # if file in ignore_scenes:
-            #     print(f"Found Invalid Scene: {file}! Ignoring...")
-            #     continue
+            if file in ignore_scenes:
+                print(f"Found Invalid Scene: {file}! Ignoring...")
+                continue
 
-            # scenes_count += 1
+            scenes_count += 1
 
             ######
 
@@ -68,7 +73,7 @@ def load_hm3d_episodes(episodes: List[Episode], scene_data: Dict[str, SceneData]
                     i += 1
 
     #####
-    # print(f"\nLoaded {scenes_count} scenes and {i} episodes.")
+    print(f"\nLoaded {scenes_count} scenes and {i} episodes.")
     #####
     return episodes, scene_data
 
