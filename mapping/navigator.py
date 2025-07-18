@@ -192,6 +192,7 @@ class Navigator:
 
         #TODO: Added. Check for text-based or multi-based similarity generation
         self.multi_prompt = config.planner.multi_prompt
+        self.query_multi_features = None
 
         # For the closed-vocabulary object detector, not needed for OneMap
         self.class_map = {}
@@ -229,6 +230,8 @@ class Navigator:
         self.nav_goals = []
         self.blacklisted_nav_goals = []
         self.artificial_obstacles = []
+
+        self.query_multi_features = None
 
     def set_camera_matrix(self,
                           camera_matrix: np.ndarray
@@ -527,11 +530,13 @@ class Navigator:
             warnings.warn("Camera matrix not set, please set camera matrix first")
             return
 
-        # detections = self.detector.detect(np.flip(image, axis=0))
+        #detections = self.detector.detect(np.flip(image, axis=0))
         # Check if RGB or BGR correct?
         # TODO I think yolo wants rgb
-        # detections = self.detector.detect(np.flip(image.transpose(1, 2, 0), axis=-1))
-
+        #detections = self.detector.detect(np.flip(image.transpose(1, 2, 0), axis=-1))
+        
+        # image_transp = np.ascontiguousarray(image.transpose(1, 2, 0))
+        # detections = self.detector.detect(image_transp)
         detections = self.detector.detect(image.transpose(1, 2, 0))   #TODO Changed: No detections are run
 
         a = time.time()
@@ -703,6 +708,11 @@ class Navigator:
         """
         if self.query_text_features is None:
             raise ValueError("No query text set")
+        
+        if (self.query_multi_features is None) and (self.multi_prompt):
+            self.query_multi_features = self.model.get_multi_features(self.query_text_features,
+                                                                        self.query_text[0]).to(self.one_map.map_device)
+        
         map_features = self.one_map.feature_map  # [X, Y, F]
         mask = self.one_map.updated_mask
         if mask.max() == 0:
@@ -717,9 +727,7 @@ class Navigator:
 
         #TODO: Changed. Text similarity -> Multi (text+image) similarity
         if self.multi_prompt:
-            similarity = self.model.compute_multi_similarity(image_feats = map_features, 
-                                                            text_feats = self.query_text_features,
-                                                            text_query = self.query_text)
+            similarity = self.model.compute_similarity(map_features, self.query_multi_features)
         else:
             similarity = self.model.compute_similarity(map_features, self.query_text_features)  
   

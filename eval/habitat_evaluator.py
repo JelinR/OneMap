@@ -88,6 +88,7 @@ class Result(enum.Enum):
     FAILURE_NOT_REACHED = 5
     FAILURE_ALL_EXPLORED = 6
     FAILURE_ERROR = 7
+    FAILURE_OBJ_ABSENT = 8
 
 class HabitatEvaluator:
     def __init__(self,
@@ -151,7 +152,7 @@ class HabitatEvaluator:
 
         #TODO Changed
         if self.is_gibson: self.results_path = "/mnt/OneMap/results/gibson"
-        elif self.is_hssd: self.results_path = "/mnt/OneMap/results/hssd"
+        elif self.is_hssd: self.results_path = f"/mnt/OneMap/results/{config.results_dir}"
         elif self.is_trial: self.results_path = "/mnt/OneMap/results/junk"
         else:
             self.results_path = "/mnt/OneMap/results/hm3d"
@@ -383,43 +384,43 @@ class HabitatEvaluator:
         #get_scene_eps = lambda f: (f.split("_")[1], int(f.split("_")[2].split(".")[0]))
         get_scene_eps = lambda f: ("_".join( f.split("state_")[-1].split("_")[:-1] ), int( f.split("_")[-1].split(".txt")[0] ))
 
-        # scene_eps_done = [get_scene_eps(f) for f in os.listdir(results_dir)]
+        scene_eps_done = [get_scene_eps(f) for f in os.listdir(results_dir)]
 
-        ref_results_dir = os.path.join("results/hssd_onemap_temp", "state")
-        ref_poses_dir = os.path.join("results/hssd_onemap_temp", "trajectories")
-        scene_eps_done = []
-        scene_eps_all = []
-        for f in os.listdir(ref_results_dir):
+        # ref_results_dir = os.path.join("results/hssd_onemap_temp", "state")
+        # ref_poses_dir = os.path.join("results/hssd_onemap_temp", "trajectories")
+        # scene_eps_done = []
+        # scene_eps_all = []
+        # for f in os.listdir(ref_results_dir):
 
-            scene_eps = get_scene_eps(f)
-            scene_eps_all.append(scene_eps)
+        #     scene_eps = get_scene_eps(f)
+        #     scene_eps_all.append(scene_eps)
 
-            pose_file = f"poses_{scene_eps[1]}.csv"
-            pose_file_path = os.path.join(ref_poses_dir, pose_file)
-            if os.path.exists(pose_file_path): scene_eps_done.append(scene_eps)
+        #     pose_file = f"poses_{scene_eps[1]}.csv"
+        #     pose_file_path = os.path.join(ref_poses_dir, pose_file)
+        #     if os.path.exists(pose_file_path): scene_eps_done.append(scene_eps)
 
 
         print(f"Finished (Scene, Episode)s: {len(scene_eps_done)}\n{scene_eps_done}")
 
 
         #Update results with saved result values
-        # for ep_num in range(len(scene_eps_done)):
+        for ep_num in range(len(scene_eps_done)):
 
-        #     saved_scene, saved_episode = [elem for elem in scene_eps_done if elem[1] == ep_num][0]
-        #     state_path = os.path.join(results_dir, f"state_{saved_scene}_{saved_episode}.txt")
-        #     with open(state_path, "r") as f:
-        #         state_result = f.readlines()
-
-        #     results.append(int(state_result[0]))
-
-        for ep_num in range(len(os.listdir(ref_results_dir))):
-
-            saved_scene, saved_episode = [elem for elem in scene_eps_all if elem[1] == ep_num][0]
-            state_path = os.path.join(ref_results_dir, f"state_{saved_scene}_{saved_episode}.txt")
+            saved_scene, saved_episode = [elem for elem in scene_eps_done if elem[1] == ep_num][0]
+            state_path = os.path.join(results_dir, f"state_{saved_scene}_{saved_episode}.txt")
             with open(state_path, "r") as f:
                 state_result = f.readlines()
 
             results.append(int(state_result[0]))
+
+        # for ep_num in range(len(os.listdir(ref_results_dir))):
+
+        #     saved_scene, saved_episode = [elem for elem in scene_eps_all if elem[1] == ep_num][0]
+        #     state_path = os.path.join(ref_results_dir, f"state_{saved_scene}_{saved_episode}.txt")
+        #     with open(state_path, "r") as f:
+        #         state_result = f.readlines()
+
+        #     results.append(int(state_result[0]))
 
         print(f"Loaded Saved Results: {results}")
         ####
@@ -445,6 +446,22 @@ class HabitatEvaluator:
 
             if curr_eps in scene_eps_done:
                 print(f"{curr_eps} already evaluated. Skipping...\n")
+                continue
+
+
+            obj_category = episode.obj_sequence[0]
+            saved_hssd_objects = os.listdir("/mnt/vlfm_query_embed/data/scraped_imgs/hssd_15")
+            if obj_category not in saved_hssd_objects: 
+                print("Object not in Saved Data Directory! Skipping...")
+
+                results.append(Result.FAILURE_OBJ_ABSENT)
+
+                results_state_dir = os.path.join(self.results_path, "state")
+                os.makedirs(results_state_dir, exist_ok=True) 
+
+                with open(f"{results_state_dir}/state_{episode.scene_id}_{episode.episode_id}.txt", 'w') as f:
+                    f.write(str(results[n_ep].value))
+
                 continue
 
             ###
@@ -496,8 +513,8 @@ class HabitatEvaluator:
             start_episode_time = time()
 
             poses = []
-            #results.append(Result.FAILURE_OOT)      #TODO COMMENTED: Need to uncomment
-            results[n_ep] = Result.FAILURE_OOT
+            results.append(Result.FAILURE_OOT)      #TODO COMMENTED: Need to uncomment
+            #results[n_ep] = Result.FAILURE_OOT
             steps = 0
             if n_ep in self.exclude_ids:
                 continue

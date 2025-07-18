@@ -15,3 +15,4 @@ class PlanningConf:
     max_detect_distance: float
     obstcl_kernel_size: float
     min_goal_dist: float
+    multi_prompt: bool

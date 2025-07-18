@@ -25,6 +25,7 @@ EvalConf:
   square_im: True
 
   saved_steps_dir: "saved_steps/hssd" #"saved_steps/hm3d"  #TODO Changed 
+  results_dir: "junk"
 
 config: [
   ./controller_habitat.yaml, # Default Habitat Controller

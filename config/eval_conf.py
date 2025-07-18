@@ -21,6 +21,7 @@ class EvalConf:
     square_im: bool
 
     saved_steps_dir: str    #TODO Changed: Directory for saved steps navigation
+    results_dir: str
 
 
 def load_eval_config():

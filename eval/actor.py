@@ -43,7 +43,7 @@ class Actor(ABC):
 class MONActor(Actor):
     def __init__(self, config):
         model = ClipModel("weights/clip.pth", jetson=False)
-        detector = YOLOWorldDetector(config.planner.yolo_confidence) if config.planner.using_ov \
+        detector = YOLOWorldDetector(config.planner.yolo_confidence, config.planner.multi_prompt) if config.planner.using_ov \
             else YOLOv7Detector(config.planner.yolo_confidence)
             # else YoloV8Detector(config.planner.yolo_confidence)
 
