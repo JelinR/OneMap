@@ -451,7 +451,7 @@ class HabitatEvaluator:
 
             obj_category = episode.obj_sequence[0]
             saved_hssd_objects = os.listdir("/mnt/vlfm_query_embed/data/scraped_imgs/hssd_15")
-            if obj_category not in saved_hssd_objects: 
+            if (obj_category not in saved_hssd_objects) or (n_ep in [56, 57, 66, 74, 92, 100, 122, 133, 135, 139]): 
                 print("Object not in Saved Data Directory! Skipping...")
 
                 results.append(Result.FAILURE_OBJ_ABSENT)
@@ -519,6 +519,7 @@ class HabitatEvaluator:
             if n_ep in self.exclude_ids:
                 continue
             n_eps += 1
+            print(f"Episode Num: {n_ep}")
             if self.sim is None or not self.sim.curr_scene_name in episode.scene_id:
                 self.load_scene(episode.scene_id)
             # if self.is_gibson:

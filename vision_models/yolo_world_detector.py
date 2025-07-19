@@ -83,7 +83,7 @@ class YOLOWorld_Multi(YOLOWorld):
 
     
     def load_image_embeds(self, text: str,
-                            scrape_num = 3,
+                            scrape_num = 1,
                             scrape_data_dir = "/mnt/vlfm_query_embed/data/scraped_imgs/hssd_15"):
 
         scraped_imgs = load_images(query = text,

@@ -162,8 +162,8 @@ class ClipModel(torch.nn.Module, BaseModel):
                                 text_feats: torch.Tensor,    # (1, C)
                                 text_query: str,
                                 scrape_data_dir: str = "/mnt/vlfm_query_embed/data/scraped_imgs/hssd_15",
-                                scrape_num: int = 15,
-                                topk: int = 20):
+                                scrape_num: int = 5,
+                                topk: int = 1):
         device = text_feats.device
         B = scrape_num
 
