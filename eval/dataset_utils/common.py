@@ -45,6 +45,7 @@ class Episode:
     obj_sequence: List[str]
     best_dist: Union[float, List[float]]
     floor_id: Union[int, None] = None
+    extra: Union[Dict, None] = None     #TODO Added: In case of extra info required
 
 @dataclass
 class GibsonEpisode(Episode):

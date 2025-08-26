@@ -113,6 +113,7 @@ class HabitatEvaluator:
         #TODO Changed
         self.is_hssd = config.is_hssd
         self.is_trial = config.is_trial
+        self.is_personal = config.is_personal
 
         self.sim = None
         self.actor = actor
@@ -142,6 +143,10 @@ class HabitatEvaluator:
                 self.episodes, self.scene_data = HM3DMultiDataset.load_hm3d_multi_episodes(self.episodes,
                                                                                            self.scene_data,
                                                                                            self.object_nav_path)
+            elif self.is_personal:
+                self.episodes, self.scene_data = PersONAL_Dataset.load_PersONAL_episodes(self.episodes,
+                                                                                self.scene_data,
+                                                                                self.object_nav_path)
             else:
                 self.episodes, self.scene_data = HM3DDataset.load_hm3d_episodes(self.episodes,
                                                                                 self.scene_data,
@@ -152,10 +157,11 @@ class HabitatEvaluator:
 
         #TODO Changed
         if self.is_gibson: self.results_path = "/mnt/OneMap/results/gibson"
-        elif self.is_hssd: self.results_path = f"/mnt/OneMap/results/{config.results_dir}"
+        elif self.is_hssd: self.results_path = f"/mnt/OneMap/results/hssd/{config.results_dir}"
         elif self.is_trial: self.results_path = "/mnt/OneMap/results/junk"
+        elif self.is_personal: self.results_path = f"/mnt/OneMap/results/PersONAL/{config.results_dir}"
         else:
-            self.results_path = "/mnt/OneMap/results/hm3d"
+            self.results_path = f"/mnt/OneMap/results/hm3d/{config.results_dir}"
             
         # self.results_path = "/mnt/OneMap/results/gibson" if self.is_gibson else "/mnt/OneMap/results/hm3d"
 
@@ -210,6 +216,8 @@ class HabitatEvaluator:
         ))
         agent_cfg.sensor_specifications = [rgb, depth]
         sim_cfg = habitat_sim.Configuration(backend_cfg, [agent_cfg])
+        print_hab_cfg(sim_cfg)
+        
         self.sim = habitat_sim.Simulator(sim_cfg)                           #TODO: Sim is Loaded here
 
         #TODO Changed: Added navmesh settings
@@ -225,12 +233,12 @@ class HabitatEvaluator:
         # print(f"Navmesh Recomputed: {navmesh_success}")
         ####
 
-        print_hab_cfg(self.sim.config)
+        # print_hab_cfg(self.sim.config)
 
 
         if self.scene_data[scene_id].objects_loaded:
             return
-        if not self.is_gibson:
+        if (not self.is_gibson) or (self.is_personal):
             self.scene_data = HM3DDataset.load_hm3d_objects(self.scene_data, self.sim.semantic_scene.objects, scene_id)
         else:
             self.scene_data = GibsonDataset.load_gibson_objects(self.scene_data, self.dataset_info, scene_id)
@@ -448,21 +456,21 @@ class HabitatEvaluator:
                 print(f"{curr_eps} already evaluated. Skipping...\n")
                 continue
 
+            #If HSSD or HM3D object not in saved scraped images dir, then continue
+            # obj_category = episode.obj_sequence[0]
+            # saved_hssd_objects = os.listdir("/mnt/vlfm_query_embed/data/scraped_imgs/hssd_15")
+            # if (obj_category not in saved_hssd_objects) or (n_ep in [56, 57, 66, 74, 92, 100, 122, 133, 135, 139]): 
+            #     print("Object not in Saved Data Directory! Skipping...")
 
-            obj_category = episode.obj_sequence[0]
-            saved_hssd_objects = os.listdir("/mnt/vlfm_query_embed/data/scraped_imgs/hssd_15")
-            if (obj_category not in saved_hssd_objects) or (n_ep in [56, 57, 66, 74, 92, 100, 122, 133, 135, 139]): 
-                print("Object not in Saved Data Directory! Skipping...")
+            #     results.append(Result.FAILURE_OBJ_ABSENT)
 
-                results.append(Result.FAILURE_OBJ_ABSENT)
+            #     results_state_dir = os.path.join(self.results_path, "state")
+            #     os.makedirs(results_state_dir, exist_ok=True) 
 
-                results_state_dir = os.path.join(self.results_path, "state")
-                os.makedirs(results_state_dir, exist_ok=True) 
+            #     with open(f"{results_state_dir}/state_{episode.scene_id}_{episode.episode_id}.txt", 'w') as f:
+            #         f.write(str(results[n_ep].value))
 
-                with open(f"{results_state_dir}/state_{episode.scene_id}_{episode.episode_id}.txt", 'w') as f:
-                    f.write(str(results[n_ep].value))
-
-                continue
+            #     continue
 
             ###
 
@@ -514,7 +522,7 @@ class HabitatEvaluator:
 
             poses = []
             results.append(Result.FAILURE_OOT)      #TODO COMMENTED: Need to uncomment
-            #results[n_ep] = Result.FAILURE_OOT
+            # results[n_ep] = Result.FAILURE_OOT
             steps = 0
             if n_ep in self.exclude_ids:
                 continue
@@ -534,6 +542,16 @@ class HabitatEvaluator:
             else:
                 obj_count[current_obj] += 1
             self.actor.set_query(current_obj)
+
+            #TODO ADDED: Category and unique ID 
+            #TODO: Need to add for multiple goal cases
+            if self.is_personal:
+                current_obj_cat = episode.extra["object_category"]
+                current_obj_id = episode.extra["object_instance"]
+                current_obj_id = int(current_obj_id.split("_")[1])
+            else:
+                current_obj_cat, current_obj_id = None, None
+
             if self.log_rerun:
                 pts = []
                 for obj in self.scene_data[episode.scene_id].object_locations[current_obj]:
@@ -599,8 +617,22 @@ class HabitatEvaluator:
                 if called_found:
                     # We will now compute the closest distance to the bounding box of the object
                     #TODO: Gets Distance to Goal Object
-                    dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
-                                            self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                    # dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
+                    #                         self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                    
+                    #TODO ADDED: Filter to specific object instance
+                    ####
+                    if self.personal:
+                        obj_locs = self.scene_data[episode.scene_id].object_locations[current_obj_cat]
+                        objs_locs = [obj for obj in obj_locs if obj.object_id == current_obj_id]
+
+                        dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
+                                                obj_locs, self.is_gibson)
+
+                    else:
+                        dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
+                                                self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                    ####
                     
                     if dist < self.max_dist:
                         results[n_ep] = Result.SUCCESS
@@ -617,19 +649,36 @@ class HabitatEvaluator:
                         else:
                             results[n_ep] = Result.FAILURE_MISDETECT
                         print(f"Object not found! Dist {dist}, detect dist: {dist_detect}.")
+                    
                     current_obj_id += 1
-                    # if current_obj_id < len(episode.obj_sequence):
-                    #     current_obj = episode.obj_sequence[current_obj_id]
-                    #     if current_obj not in success_per_obj:
-                    #         success_per_obj[current_obj] = 0
-                    #         obj_count[current_obj] = 1
-                    #         obj_count[current_obj] += 1
-                    #     self.actor.set_query(current_obj)
+                    if current_obj_id < len(episode.obj_sequence):
+                        current_obj = episode.obj_sequence[current_obj_id]
+                        if current_obj not in success_per_obj:
+                            success_per_obj[current_obj] = 0
+                            obj_count[current_obj] = 1
+                            obj_count[current_obj] += 1
+                        self.actor.set_query(current_obj)
 
                 if steps % 100 == 0:
-                    #TODO: Calculates Distance to Goal Object
-                    dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
-                                            self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                    #TODO: Calculates Distance to Goal Object                        
+                    # dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
+                    #                         self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                    
+                    #TODO ADDED: Filter to specific object instance
+                    ####
+                    if self.personal:
+                        obj_locs = self.scene_data[episode.scene_id].object_locations[current_obj_cat]
+                        objs_locs = [obj for obj in obj_locs if obj.object_id == current_obj_id]
+
+                        dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
+                                                obj_locs, self.is_gibson)
+
+                    else:
+                        dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
+                                                self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                    ####
+
+
                     print(f"Step {steps}, current object: {current_obj}, episode_id: {episode.episode_id}, distance to closest object: {dist}")
                 steps += 1
 

@@ -12,6 +12,7 @@ class EvalConf:
     is_gibson: bool
     is_hssd: bool                   #TODO Changed
     is_trial: bool                  #TODO Changed
+    is_personal: bool               #TODO: Changed
     controller: HabitatControllerConf
     mapping: MappingConf
     planner: PlanningConf

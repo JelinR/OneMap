@@ -15,6 +15,18 @@
             "args": ["--config",  "config/mon/eval_conf.yaml",
                     "--PlanningConf.using_ov",
                     "--PlanningConf.multi_prompt"]
+        },
+
+        {
+            "name": "PersONAL Debug",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "eval_habitat",
+            // "args": ["--config",  "config/mon/eval_conf.yaml",
+            //         "--PlanningConf.multi_prompt"]
+            "args": ["--config",  "config/mon/eval_conf.yaml",
+                    "--PlanningConf.using_ov",
+                    "--EvalConf.is_personal"]
         }
     ]
 }
