@@ -18,8 +18,8 @@ def get_dist_to_bbox_2d(center, size, pos):
     dx = pos[0] - center[0]
     dy = pos[1] - center[1]
 
-    if pos[0] < min_corner_2d[0] or pos[0] > max_corner_2d[0]:
-        if pos[1] < min_corner_2d[1] or pos[1] > max_corner_2d[1]:
+    if pos[0] < min_corner_2d[0] or pos[0] > max_corner_2d[0]:          #If the agent_x is outside of the object's x-range
+        if pos[1] < min_corner_2d[1] or pos[1] > max_corner_2d[1]:      #If the agent_y is outside of the object's y-range
             """
             star region
             *  |  |  *
@@ -32,9 +32,9 @@ def get_dist_to_bbox_2d(center, size, pos):
 
             dx_c = np.abs(dx) - size[0] / 2
             dy_c = np.abs(dy) - size[1] / 2
-            dist = np.sqrt(dx_c * dx_c + dy_c * dy_c)
+            dist = np.sqrt(dx_c * dx_c + dy_c * dy_c)       #Dist to one of the corners of object boundary
             return dist
-        else:
+        else:                                                       #If the agent_y is within the object's y-range
             """
             star region
                |  |
@@ -44,9 +44,9 @@ def get_dist_to_bbox_2d(center, size, pos):
                |  |
                |  |
             """
-            dx_b = np.abs(dx) - size[0] / 2
+            dx_b = np.abs(dx) - size[0] / 2                 #Dist to one of the y-edges of the object's boundaries
             return dx_b
-    else:
+    else:                                                           #If the agent_x is within the object's x-range
         if pos[1] < min_corner_2d[1] or pos[1] > max_corner_2d[1]:
             """
             star region
@@ -57,11 +57,11 @@ def get_dist_to_bbox_2d(center, size, pos):
                |* |
                |  |
             """
-            dy_b = np.abs(dy) - size[1] / 2
+            dy_b = np.abs(dy) - size[1] / 2             #Dist to one of the x-edges of the object's boundaries
             return dy_b
 
         """
-        star region
+        star region                                                
            |  |  
         ___|__|___
            |* |   
@@ -69,7 +69,7 @@ def get_dist_to_bbox_2d(center, size, pos):
            |  |   
            |  |  
         """
-        return 0
+        return 0                                                    #If the agent is inside the object's boundaries
 
 
 def get_closest_dist(pos, aabbs: List, is_gibson=False):
