@@ -31,6 +31,7 @@ EvalConf:
 
   saved_steps_dir: "saved_steps/hssd" #"saved_steps/hm3d"  #TODO Changed 
   results_dir: "junk"
+  run_split: 0      #Choices: [0, 1, 2]. If 0, loads all the episodes. If 1 or 2, loads half of the episodes as a split.
 
 config: [
   ./controller_habitat.yaml, # Default Habitat Controller

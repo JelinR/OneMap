@@ -55,8 +55,8 @@ class MONActor(Actor):
 
         self.mapper = Navigator(model, detector, config)
 
-        self.init = 36*2   #TODO Changed: The agent does not initialize by turning 360 degrees
-        #self.init = -1
+        #self.init = 36*2   #TODO Changed: The agent does not initialize by turning 360 degrees
+        self.init = -1
 
         hfov = 90 if self.square else 97
         res_x = 640

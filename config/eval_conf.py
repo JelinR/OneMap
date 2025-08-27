@@ -23,6 +23,7 @@ class EvalConf:
 
     saved_steps_dir: str    #TODO Changed: Directory for saved steps navigation
     results_dir: str
+    run_split: int
 
 
 def load_eval_config():

@@ -427,11 +427,14 @@ class Navigator:
             for cluster in clusters:
                 # print(cluster)
 
-                try:
-                    cluster.compute_score(adjusted_score)
-                except:
-                    print("Cluster Calculation failed. Breaking out of loop...")
-                    break
+                #TODO ADDED
+                # try:
+                #     cluster.compute_score(adjusted_score)
+                # except:
+                #     print("Cluster Calculation failed. Breaking out of loop...")
+                #     break
+
+                cluster.compute_score(adjusted_score)
 
                 if len(self.blacklisted_nav_goals) == 0 or not np.any(
                         np.all(cluster.get_descr_point() == self.blacklisted_nav_goals, axis=1)):
@@ -441,7 +444,7 @@ class Navigator:
                             (not self.one_map.checked_map[cluster.center[0], cluster.center[1]]):
                         self.nav_goals.append(cluster)
 
-            print(f"Broken out of loop. ")
+            # print(f"Broken out of loop. ")
             if self.log:
                 cluster_max_similarity = np.zeros_like(self.previous_sims[0])
 
@@ -537,7 +540,7 @@ class Navigator:
         
         # image_transp = np.ascontiguousarray(image.transpose(1, 2, 0))
         # detections = self.detector.detect(image_transp)
-        detections = self.detector.detect(image.transpose(1, 2, 0))   #TODO Changed: No detections are run
+        detections = self.detector.detect(image.transpose(1, 2, 0))   #TODO Imp: Detections are run here
 
         a = time.time()
         image_features = self.model.get_image_features(image[np.newaxis, ...]).squeeze(0)

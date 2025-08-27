@@ -390,9 +390,10 @@ class HabitatEvaluator:
         
 
         #get_scene_eps = lambda f: (f.split("_")[1], int(f.split("_")[2].split(".")[0]))
-        get_scene_eps = lambda f: ("_".join( f.split("state_")[-1].split("_")[:-1] ), int( f.split("_")[-1].split(".txt")[0] ))
+        # get_done_eps = lambda f: ("_".join( f.split("state_")[-1].split("_")[:-1] ), int( f.split("_")[-1].split(".txt")[0] ))
+        get_done_eps = lambda f: int( f.split("_")[-1].split(".txt")[0] )
 
-        scene_eps_done = [get_scene_eps(f) for f in os.listdir(results_dir)]
+        scene_eps_done = [get_done_eps(f) for f in os.listdir(results_dir)]
 
         # ref_results_dir = os.path.join("results/hssd_onemap_temp", "state")
         # ref_poses_dir = os.path.join("results/hssd_onemap_temp", "trajectories")
@@ -412,10 +413,10 @@ class HabitatEvaluator:
 
 
         #Update results with saved result values
-        for ep_num in range(len(scene_eps_done)):
+        for ep_num in scene_eps_done:
 
-            saved_scene, saved_episode = [elem for elem in scene_eps_done if elem[1] == ep_num][0]
-            state_path = os.path.join(results_dir, f"state_{saved_scene}_{saved_episode}.txt")
+            # saved_episode = [elem for elem in scene_eps_done if elem[1] == ep_num][0]
+            state_path = os.path.join(results_dir, f"state_{ep_num}.txt")
             with open(state_path, "r") as f:
                 state_result = f.readlines()
 
@@ -439,21 +440,34 @@ class HabitatEvaluator:
         episode_time_path = f"{self.results_path}/timings/episode_times.txt"
         os.makedirs(os.path.dirname(step_time_path), exist_ok=True)
 
+        #TODO ADDED: Train in multiple terminals for different episodes
+        assert self.config.run_split in [0, 1, 2]
+
+        if self.config.run_split == 1:
+            self.exclude_ids = np.arange(300, len(self.episodes))
+            print(f"Loading split 1 episodes...")
+            assert "split_1" in self.config.results_dir
+
+        elif self.config.run_split == 2:
+            self.exclude_ids = np.arange(0, 300)
+            print(f"Loading split 2 episodes...")
+            assert "split_2" in self.config.results_dir
+
         
         # restart at 930
         for n_ep, episode in enumerate(self.episodes):
         # for n_ep, episode in enumerate(self.episodes[492:]):
 
             ###TODO Changed: Skip episodes already run
-            curr_eps = (episode.scene_id, episode.episode_id)
-            print(f"Current (Scene, Episode): {curr_eps}")
+            # curr_eps = (episode.scene_id, episode.episode_id)
+            # print(f"Current (Scene, Episode): {curr_eps}")
 
             # if curr_eps != ("102344094", 8):
             #     print(f'{curr_eps} is not ("102344094", 8). Skipping...')
             #     continue
 
-            if curr_eps in scene_eps_done:
-                print(f"{curr_eps} already evaluated. Skipping...\n")
+            if episode.episode_id in scene_eps_done:
+                print(f"{episode.episode_id} already evaluated. Skipping...\n")
                 continue
 
             #If HSSD or HM3D object not in saved scraped images dir, then continue
@@ -527,7 +541,7 @@ class HabitatEvaluator:
             if n_ep in self.exclude_ids:
                 continue
             n_eps += 1
-            print(f"Episode Num: {n_ep}")
+            print(f"\n\nEpisode Num: {n_ep}")
             if self.sim is None or not self.sim.curr_scene_name in episode.scene_id:
                 self.load_scene(episode.scene_id)
             # if self.is_gibson:
@@ -546,11 +560,12 @@ class HabitatEvaluator:
             #TODO ADDED: Category and unique ID 
             #TODO: Need to add for multiple goal cases
             if self.is_personal:
-                current_obj_cat = episode.extra["object_category"]
-                current_obj_id = episode.extra["object_instance"]
-                current_obj_id = int(current_obj_id.split("_")[1])
+                curr_obj_cat = episode.extra["object_category"]
+                # curr_obj_id = episode.extra["object_instance"]
+                # curr_obj_id = int(curr_obj_id.split("_")[1])
+                curr_obj_instance = episode.extra["object_instance"]
             else:
-                current_obj_cat, current_obj_id = None, None
+                curr_obj_cat, curr_obj_id = None, None
 
             if self.log_rerun:
                 pts = []
@@ -622,9 +637,9 @@ class HabitatEvaluator:
                     
                     #TODO ADDED: Filter to specific object instance
                     ####
-                    if self.personal:
-                        obj_locs = self.scene_data[episode.scene_id].object_locations[current_obj_cat]
-                        objs_locs = [obj for obj in obj_locs if obj.object_id == current_obj_id]
+                    if self.is_personal:
+                        obj_locs = self.scene_data[episode.scene_id].object_locations[curr_obj_cat]
+                        obj_locs = [obj for obj in obj_locs if obj.object_id == curr_obj_instance]
 
                         dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
                                                 obj_locs, self.is_gibson)
@@ -642,8 +657,26 @@ class HabitatEvaluator:
                     else:
                         pos = self.actor.mapper.chosen_detection
                         pos_metric = self.actor.mapper.one_map.px_to_metric(pos[0], pos[1])
-                        dist_detect = get_closest_dist([-pos_metric[1], -pos_metric[0]],
-                                            self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+
+                        #TODO COMMENTED
+                        # dist_detect = get_closest_dist([-pos_metric[1], -pos_metric[0]],
+                        #                     self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                        
+                        #TODO ADDED: Filter to specific object instance
+                        ####
+                        if self.is_personal:
+                            obj_locs = self.scene_data[episode.scene_id].object_locations[curr_obj_cat]
+                            obj_locs = [obj for obj in obj_locs if obj.object_id == curr_obj_instance]
+
+                            dist_detect = get_closest_dist([-pos_metric[1], -pos_metric[0]],
+                                                    obj_locs, self.is_gibson)
+
+                        else:
+                            dist_detect = get_closest_dist([-pos_metric[1], -pos_metric[0]],
+                                                self.scene_data[episode.scene_id].object_locations[current_obj], self.is_gibson)
+                            
+                        ####
+
                         if dist_detect < self.max_dist:
                             results[n_ep] = Result.FAILURE_NOT_REACHED
                         else:
@@ -666,9 +699,9 @@ class HabitatEvaluator:
                     
                     #TODO ADDED: Filter to specific object instance
                     ####
-                    if self.personal:
-                        obj_locs = self.scene_data[episode.scene_id].object_locations[current_obj_cat]
-                        objs_locs = [obj for obj in obj_locs if obj.object_id == current_obj_id]
+                    if self.is_personal:
+                        obj_locs = self.scene_data[episode.scene_id].object_locations[curr_obj_cat]
+                        obj_locs = [obj for obj in obj_locs if obj.object_id == curr_obj_instance]
 
                         dist = get_closest_dist(self.sim.get_agent(0).get_state().position[[0, 2]],
                                                 obj_locs, self.is_gibson)
@@ -700,6 +733,7 @@ class HabitatEvaluator:
             save_path = f"{self.results_path}/trajectories/poses_{episode.episode_id}.csv"  #TODO OG Changed: Added save_path
             os.makedirs(os.path.dirname(save_path), exist_ok = True)
             np.savetxt(save_path, poses, delimiter=",")
+            print(f"\nSaved poses to {save_path}")
             #########
 
             # save final sim to image file
@@ -708,8 +742,8 @@ class HabitatEvaluator:
             final_sim = final_sim.transpose((1, 0))
             final_sim = np.flip(final_sim, axis=0)
             final_sim = monochannel_to_inferno_rgb(final_sim)
-            #save_path = f"{self.results_path}/similarities/final_sim_{episode.episode_id}.png"
-            save_path = f"{self.results_path}/similarities/final_sim_{episode.scene_id}_{episode.episode_id}.png"          #TODO Changed: Included scene info
+            save_path = f"{self.results_path}/similarities/final_sim_{episode.episode_id}.png"
+            # save_path = f"{self.results_path}/similarities/final_sim_{episode.scene_id}_{episode.episode_id}.png"          #TODO Changed: Included scene info
             os.makedirs(os.path.dirname(save_path), exist_ok = True)
             
             cv2.imwrite(save_path, final_sim)
@@ -745,7 +779,7 @@ class HabitatEvaluator:
             results_state_dir = os.path.join(self.results_path, "state")
             os.makedirs(results_state_dir, exist_ok=True) 
 
-            with open(f"{results_state_dir}/state_{episode.scene_id}_{episode.episode_id}.txt", 'w') as f:
+            with open(f"{results_state_dir}/state_{episode.episode_id}.txt", 'w') as f:
                 f.write(str(results[n_ep].value))
             ###########
 
