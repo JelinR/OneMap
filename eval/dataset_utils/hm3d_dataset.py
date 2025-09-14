@@ -18,11 +18,13 @@ def load_hm3d_episodes(episodes: List[Episode], scene_data: Dict[str, SceneData]
 
     #Ignore Scenes that are tough to explore
     ignore_scenes_path = os.path.join(os.path.dirname(object_nav_path[:-1]), "ignore_scenes.txt")
-    print(ignore_scenes_path)
-    with open(ignore_scenes_path, "r") as f:
-        ignore_scenes = f.readlines()
+    if os.path.exists(ignore_scenes_path):
+        with open(ignore_scenes_path, "r") as f:
+            ignore_scenes = f.readlines()
 
-    ignore_scenes = [name.strip() + ".json.gz" for name in ignore_scenes]
+        ignore_scenes = [name.strip() + ".json.gz" for name in ignore_scenes]
+    else: 
+        ignore_scenes = []
     scenes_count = 0
 
     #Track Scenes and Episodes that are completed

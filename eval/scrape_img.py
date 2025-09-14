@@ -77,7 +77,7 @@ def load_images(query: str, num_images: int, save_dir: str = SCRAPED_SAVE_DIR):
     if not is_file_present:
         # print(f"{query} files not found! Downloading {num_images} images...")
         # download_google_images(query, num_images, save_dir)
-        print(f"{query} files not found! Skipping...")
+        print(f"{query} files not found in {save_dir}! Skipping...")
         return []
     
     query_dir = os.path.join(save_dir, query)

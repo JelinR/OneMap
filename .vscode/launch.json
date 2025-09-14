@@ -6,7 +6,18 @@
     "configurations": [
 
         {
-            "name": "Python Debugger: Module OneMap",
+            "name": "Debug: OneMap Stand",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "eval_habitat",
+            // "args": ["--config",  "config/mon/eval_conf.yaml",
+            //         "--PlanningConf.multi_prompt"]
+            "args": ["--config",  "config/mon/eval_conf.yaml",
+                    "--PlanningConf.using_ov",]
+        },
+
+        {
+            "name": "Debug: OneMap + IMPRINT",
             "type": "debugpy",
             "request": "launch",
             "module": "eval_habitat",
@@ -18,7 +29,7 @@
         },
 
         {
-            "name": "PersONAL Debug",
+            "name": "Debug: OneMap Stand + PersONAL",
             "type": "debugpy",
             "request": "launch",
             "module": "eval_habitat",

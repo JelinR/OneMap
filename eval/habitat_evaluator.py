@@ -160,15 +160,19 @@ class HabitatEvaluator:
         elif self.is_hssd: self.results_path = f"/mnt/OneMap/results/hssd/{config.results_dir}"
         elif self.is_trial: self.results_path = "/mnt/OneMap/results/junk"
         elif self.is_personal: self.results_path = f"/mnt/OneMap/results/PersONAL/{config.results_dir}"
+        elif "ovon" in self.object_nav_path: self.results_path = f"/mnt/OneMap/results/ovon/{config.results_dir}"
         else:
             self.results_path = f"/mnt/OneMap/results/hm3d/{config.results_dir}"
             
         # self.results_path = "/mnt/OneMap/results/gibson" if self.is_gibson else "/mnt/OneMap/results/hm3d"
 
-        
-
         self.saved_steps_dir = config.saved_steps_dir
         self.saved_steps = None
+
+
+        # if self.log_rerun:                                          #TODO Addd: REMOVE
+        #     os.makedirs(self.results_path, exist_ok=True)
+        #     rr.save(os.path.join(self.results_path, "rr_run.rrd"))
 
     def load_scene(self, scene_id: str):
         if self.sim is not None:
@@ -409,7 +413,7 @@ class HabitatEvaluator:
         #     if os.path.exists(pose_file_path): scene_eps_done.append(scene_eps)
 
 
-        print(f"Finished (Scene, Episode)s: {len(scene_eps_done)}\n{scene_eps_done}")
+        print(f"Finished (Scene, Episode)s: {len(scene_eps_done)}/{len(self.episodes)}\n{scene_eps_done}")
 
 
         #Update results with saved result values
@@ -464,6 +468,10 @@ class HabitatEvaluator:
 
             # if curr_eps != ("102344094", 8):
             #     print(f'{curr_eps} is not ("102344094", 8). Skipping...')
+            #     continue
+
+            #Only evaluate specific episode
+            # if n_ep != 0:
             #     continue
 
             if episode.episode_id in scene_eps_done:
@@ -568,8 +576,10 @@ class HabitatEvaluator:
                 curr_obj_cat, curr_obj_id = None, None
 
             if self.log_rerun:
+
                 pts = []
-                for obj in self.scene_data[episode.scene_id].object_locations[current_obj]:
+                # for obj in self.scene_data[episode.scene_id].object_locations[current_obj]:   #TODO Commented
+                for obj in self.scene_data[episode.scene_id].object_locations[curr_obj_cat]:
                     if not self.is_gibson:
                         pt = obj.bbox.center[[0, 2]]
                         pt = (-pt[1], -pt[0])

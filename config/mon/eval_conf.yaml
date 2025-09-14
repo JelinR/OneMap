@@ -11,10 +11,16 @@ EvalConf:
   # object_nav_path: "habitat-lab/data/datasets/objectnav/hm3d/v1/val/content/"
   # scene_path: "habitat-lab/data/scene_datasets/"
 
-  #PersONAL
-  is_personal: True
-  object_nav_path: "habitat-lab/data/datasets/objectnav/eai_pers/active/val/easy/content/"
+  #OVON
+  object_nav_path: "habitat-lab/data/datasets/ovon/hm3d/val_seen_synonyms_equal/content"
   scene_path: "habitat-lab/data/scene_datasets/"
+
+  #PersONAL
+  is_personal: False
+  # object_nav_path: "habitat-lab/data/datasets/objectnav/eai_pers/active/val/easy/content/"
+  # object_nav_path: "habitat-lab/data/datasets/objectnav/eai_pers/active/val/medium/content/"
+  # object_nav_path: "habitat-lab/data/datasets/objectnav/eai_pers/active/val/hard/content/"
+  # scene_path: "habitat-lab/data/scene_datasets/"
 
   #HSSD
   is_hssd: False
