@@ -148,7 +148,7 @@ class Navigator:
         self.one_map = OneMap(self.model.feature_dim, config.mapping, map_device="cpu")
 
         self.query_text = ["Other."]
-        self.query_text_features = self.model.get_text_features(self.query_text).to(self.one_map.map_device)
+        self.query_text_features = self.model.get_text_features(self.query_text).to(self.one_map.map_device)    #Shape: (1, 768)
         self.previous_sims = None
 
         # Frontier and POIs
@@ -712,7 +712,7 @@ class Navigator:
         if self.query_text_features is None:
             raise ValueError("No query text set")
         
-        if (self.query_multi_features is None) and (self.multi_prompt):
+        if (self.query_multi_features is None) and (self.multi_prompt):     #TODO Added: IMPRINT
             self.query_multi_features = self.model.get_multi_features(self.query_text_features,
                                                                         self.query_text[0]).to(self.one_map.map_device)
         
@@ -726,7 +726,7 @@ class Navigator:
         if self.previous_sims is not None:
             map_features = map_features[mask, :].permute(1, 0).unsqueeze(0)
         else:
-            map_features = map_features.permute(2, 0, 1).unsqueeze(0)
+            map_features = map_features.permute(2, 0, 1).unsqueeze(0)   #Shape: (1, 768, 600, 600)
 
         #TODO: Changed. Text similarity -> Multi (text+image) similarity
         if self.multi_prompt:

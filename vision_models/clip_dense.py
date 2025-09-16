@@ -91,7 +91,7 @@ class ClipModel(torch.nn.Module, BaseModel):
         if len(image_feats.shape) == 3:
             return torch.einsum('bcx, bc -> bx', image_feats, text_feats)
         else:
-            return torch.einsum('bchw, bc -> bhw', image_feats, text_feats)
+            return torch.einsum('bchw, bc -> bhw', image_feats, text_feats) #Shapes: (1, 768, 600, 600), (1, 768) -> (1, 600, 600)
 
 
     def compute_multi_similarity_old(self,
@@ -158,12 +158,12 @@ class ClipModel(torch.nn.Module, BaseModel):
         #Mean along the batch axis
         return sim_grids.mean(dim=0, keepdim=True)
 
-    def get_multi_features(self,
+    def get_multi_features(self,                                                #TODO Added: IMPRINT
                                 text_feats: torch.Tensor,    # (1, C)
                                 text_query: str,
-                                scrape_data_dir: str = "/mnt/vlfm_query_embed/data/scraped_imgs/hssd_15",
-                                scrape_num: int = 5,
-                                topk: int = 1):
+                                scrape_data_dir: str = "/mnt/vlfm_query_embed/data/scraped_imgs/ovon_15",
+                                scrape_num: int = 15,
+                                topk: int = 20):
         device = text_feats.device
         B = scrape_num
 
@@ -214,7 +214,7 @@ class ClipModel(torch.nn.Module, BaseModel):
         scraped_img_feats = selected.mean(dim=1)                # (B, C)                       
         all_feats = torch.cat([scraped_img_feats, text_feats], dim=0)  # (B+1, C)
 
-        return all_feats
+        return all_feats.mean(dim=0, keepdim=True)      #Mean over all image+text embeds
 
         
 
