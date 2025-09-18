@@ -31,6 +31,7 @@ class YOLOWorldDetector:
         else:
             self.model = YOLOWorld(model_id="yolo_world/l")
 
+        print(f"\nSetting YOLOWorld Conf Thresh : {confidence_threshold}\n")
         self.confidence_threshold = confidence_threshold
         self.classes = None
 
@@ -83,7 +84,7 @@ class YOLOWorld_Multi(YOLOWorld):
 
     
     def load_image_embeds(self, text: str,
-                            scrape_num = 8,
+                            scrape_num = 3,
                             scrape_data_dir = "/mnt/vlfm_query_embed/data/scraped_imgs/ovon_15"):
 
         scraped_imgs = load_images(query = text,
