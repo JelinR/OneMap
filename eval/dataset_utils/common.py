@@ -36,6 +36,7 @@ class SceneData:
     objects_loaded: bool = False
 
 
+
 @dataclass
 class Episode:
     scene_id: str
