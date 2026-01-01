@@ -163,7 +163,7 @@ class ClipModel(torch.nn.Module, BaseModel):
                                 text_query: str,
                                 scrape_data_dir: str = "/mnt/vlfm_query_embed/data/scraped_imgs/ovon_15",
                                 scrape_num: int = 15,
-                                topk: int = 20):
+                                topk: int = 1):
         device = text_feats.device
         B = scrape_num
 

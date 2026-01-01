@@ -1,0 +1,50 @@
+cushion
+armchair
+fireplace
+lamp
+curtain
+kitchen cabinet
+kitchen counter
+kitchen island
+bathroom counter
+shower curtain
+chest of drawers
+lamp table
+table lamp
+stairs railing
+railing
+dining table
+dining chair
+bookshelf
+shelf
+computer desk
+computer chair
+computer
+bed table
+clothes rack
+window frame
+tv stand
+file cabinet
+desk chair
+bath cabinet
+coffee table
+refrigerator cabinet
+tablecloth
+backpack
+throw blanket
+window curtain
+electric box
+bicycle
+curtain rod
+bath sink
+ironing board
+bedside lamp
+bar chair
+furnace
+chest drawer
+bed sheet
+water heater
+folding chair
+appliance
+shower tub
+exercise equipment
