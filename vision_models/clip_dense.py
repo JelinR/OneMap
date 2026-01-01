@@ -172,14 +172,15 @@ class ClipModel(torch.nn.Module, BaseModel):
         # raw_imgs: list of np.uint8 H×W×3 BGR arrays
         preprocess = transforms.Compose([
             transforms.ToTensor(),             # → [0,1] RGB, shape (3, H, W)
-            transforms.Resize(224),            # shorter side → 224
-            transforms.CenterCrop(224),        # → (3, 224, 224)
+            transforms.Resize(1000),            # shorter side → 224
+            transforms.CenterCrop(1000),        # → (3, 224, 224)
         ])
         imgs_t = torch.stack([ preprocess(img[..., ::-1]) for img in raw_imgs ], dim=0)
-        imgs_t = imgs_t.to(device)             # (B, 3, 224, 224)
+        # imgs_t = imgs_t.to(device)             # (B, 3, 224, 224)
 
         # 2) EXTRACT PATCHED IMAGE FEATURES → (B, C, Hp, Wp) e.g. (15, 768, 24, 24)
-        scraped_patch_feats = self.get_image_features(imgs_t.cpu().numpy()).to(device = device)  # already on correct device
+        scraped_patch_feats = self.get_image_features(imgs_t.cpu().numpy()).to(device = device)
+        # print(scraped_patch_feats.shape)
 
         # 3) COMPUTE COSINE SIMILARITY PER PATCH → (B, Hp, Wp)
         #    text_feats: (C,) or (1,C) → make (1, C, 1, 1) so it broadcasts
@@ -189,11 +190,13 @@ class ClipModel(torch.nn.Module, BaseModel):
             text_ref,                           # (1, C, 1, 1) broadcast → (B, C, Hp, Wp)
             dim=1
         )  # → (B, Hp, Wp)
+        # print(patch_sim.shape)
 
         # 4) FLATTEN & TOP‑K → get flat indices of the k best patches per image
         B, Hp, Wp = patch_sim.shape
         flat = patch_sim.view(B, -1)             # (B, Hp*Wp)
-        topk_vals, topk_inds = flat.topk(topk, dim=1, largest=True, sorted=True)  # both (B, topk)
+        topk_vals, topk_inds = flat.topk(topk, dim=1, largest=True, sorted=False)  # both (B, topk)
+        # print(topk_vals.shape, topk_inds.shape)
 
         # 5) CONVERT FLAT → (row, col)
         row_idx = topk_inds // Wp                # (B, topk)
@@ -209,12 +212,19 @@ class ClipModel(torch.nn.Module, BaseModel):
             row_idx,                                            # Hp‑dim
             col_idx                                             # Wp‑dim
         ]
+        # print(selected.shape)
 
         # 7) POOL & CONCAT TEXT VECTOR → (B+1, C)
-        scraped_img_feats = selected.mean(dim=1)                # (B, C)                       
+        scraped_img_feats = selected.mean(dim=1)                    # (B, C)   
+        scraped_img_feats = F.normalize(scraped_img_feats, dim=1)   # (B, C)
+        # print(scraped_img_feats.shape)
+                    
         all_feats = torch.cat([scraped_img_feats, text_feats], dim=0)  # (B+1, C)
+        all_feats = all_feats.mean(dim=0, keepdim=True)                # (1, C)
+        all_feats = F.normalize(all_feats, dim=1)                      # (1, C)
+        # print(all_feats.shape)
 
-        return all_feats.mean(dim=0, keepdim=True)      #Mean over all image+text embeds
+        return all_feats      #Mean over all image+text embeds
 
         
 
