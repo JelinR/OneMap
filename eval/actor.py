@@ -42,8 +42,8 @@ class Actor(ABC):
 
 class MONActor(Actor):
     def __init__(self, config):
-        model = ClipModel("weights/clip.pth", jetson=False)
-        detector = YOLOWorldDetector(config.planner.yolo_confidence, config.planner.multi_prompt) if config.planner.using_ov \
+        model = ClipModel("weights/clip.pth", jetson=False, scrape_num = config.planner.scrape_num)
+        detector = YOLOWorldDetector(config.planner.yolo_confidence, config.planner.multi_detect) if config.planner.using_ov \
             else YOLOv7Detector(config.planner.yolo_confidence)
             # else YoloV8Detector(config.planner.yolo_confidence)
 

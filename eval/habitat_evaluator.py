@@ -160,9 +160,9 @@ class HabitatEvaluator:
         elif self.is_hssd: self.results_path = f"/mnt/OneMap/results/hssd/{config.results_dir}"
         elif self.is_trial: self.results_path = "/mnt/OneMap/results/junk"
         elif self.is_personal: self.results_path = f"/mnt/OneMap/results/PersONAL/{config.results_dir}"
-        elif "ovon" in self.object_nav_path: self.results_path = f"/mnt/OneMap/results/ovon/{config.results_dir}"
+        elif "ovon" in self.object_nav_path: self.results_path = config.results_dir
         else:
-            self.results_path = f"/mnt/OneMap/results/hm3d/{config.results_dir}"
+            self.results_path = config.results_dir
             
         # self.results_path = "/mnt/OneMap/results/gibson" if self.is_gibson else "/mnt/OneMap/results/hm3d"
 

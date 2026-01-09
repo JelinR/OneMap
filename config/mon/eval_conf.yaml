@@ -12,7 +12,7 @@ EvalConf:
   # scene_path: "habitat-lab/data/scene_datasets/"
 
   #OVON
-  object_nav_path: "habitat-lab/data/datasets/ovon/hm3d/val_seen_synonyms_equal/content"
+  object_nav_path: "habitat-lab/data/datasets/ovon/ovon_equal/val_seen_synonyms_equal/content"
   scene_path: "habitat-lab/data/scene_datasets/"
 
   #PersONAL

@@ -29,12 +29,14 @@ from eval.scrape_img import load_images
 class ClipModel(torch.nn.Module, BaseModel):
     def __init__(self,
                  path: str,
-                 jetson: bool = False
+                 jetson: bool = False,
+                 scrape_num: int = 15,
                  ):
         super(ClipModel, self).__init__()
         self.jetson = jetson
 
         self.input_format = "RGB"
+        self.scrape_num = scrape_num
 
         self.aug = T.ResizeShortestEdge(
             [640, 640], 2560
@@ -94,89 +96,30 @@ class ClipModel(torch.nn.Module, BaseModel):
             return torch.einsum('bchw, bc -> bhw', image_feats, text_feats) #Shapes: (1, 768, 600, 600), (1, 768) -> (1, 600, 600)
 
 
-    def compute_multi_similarity_old(self,
-                                    image_feats: torch.Tensor,
-                                    text_feats: torch.Tensor,
-                                    text_query: str,
-                                    scrape_data_dir: str = "/mnt/vlfm_query_embed/data/scraped_imgs/hssd_15",
-                                    scrape_num: int = 15):
-        
-        #Shape: (1, H, W, C)
-        scraped_imgs = load_images(query = text_query,
-                                   num_images = scrape_num,
-                                   save_dir=scrape_data_dir)
-
-        standard_size = (224, 224)
-        scraped_imgs = batch_resize_and_pad(img_list = scraped_imgs, target_size = standard_size)
-
-        #Transform to BGR, and then permute shape to (B, C, H, W)
-        scraped_imgs = scraped_imgs[:, :, :, ::-1]
-        scraped_imgs = np.transpose(scraped_imgs, (0, 3, 1, 2))
-        # print(np.shape(scraped_imgs))
-
-        # print(text_feats.size)  #(1, 768)
-
-        #Scraped Image feature vectors. Shape: (15, 768, 24, 24)
-        scraped_patch_feats = self.get_image_features(scraped_imgs).to(device = text_feats.device)
-        # print(f"\n\n!!!!Shape for scraped img feats: ", scraped_patch_feats.shape, "!!!!\n\n")
-
-        text_ref_feat = text_feats.unsqueeze(-1).unsqueeze(-1)  #Shape: (1, 768, 1, 1)
-
-        #Get the patch embedding most similar to text embedding
-        patch_sim_scores = F.cosine_similarity(scraped_patch_feats, text_ref_feat, dim = 1) #Shape: (15, 24, 24)
-
-        #Get top 20 patch indices for each image. Then, for each image, average the top 20 patches. 
-        top_rows, top_cols = topk_patch_indices(patch_sim_scores, k = 1)   #Shape: (15, 20), (15, 20)
-        
-        scraped_img_feats = None
-        img_num = 0
-        for img_r, img_c in zip(top_rows, top_cols):
-
-            #For an image (img_num), obtain the top 20 patches and average
-            top_embeds = scraped_patch_feats[img_num, :, img_r, img_c]   #Shape: (768, 20)
-            top_embed = top_embeds.mean(axis = 1).unsqueeze(0)           #Shape: (1, 768)
-
-            if scraped_img_feats is None:
-                scraped_img_feats = top_embed
-            else:
-                scraped_img_feats = torch.concat((scraped_img_feats, top_embed), axis = 0)
-
-            img_num += 1
-
-
-        #Concat text feature with scraped feats along the batch axis
-        scraped_img_feats = torch.cat((scraped_img_feats, text_feats), dim=0)   #Shape: (16, 768)
-
-        #Calculate the similarity grids for each feature vector
-        # sim_grids = torch.einsum('bchw, bc -> bhw', image_feats, scraped_img_feats)
-
-        if len(image_feats.shape) == 3:
-            sim_grids = torch.einsum('bcx, bc -> bx', image_feats, scraped_img_feats)
-        else:
-            sim_grids = torch.einsum('bchw, bc -> bhw', image_feats, scraped_img_feats)
-
-        #Mean along the batch axis
-        return sim_grids.mean(dim=0, keepdim=True)
-
     def get_multi_features(self,                                                #TODO Added: IMPRINT
                                 text_feats: torch.Tensor,    # (1, C)
                                 text_query: str,
-                                scrape_data_dir: str = "/mnt/vlfm_query_embed/data/scraped_imgs/ovon_15",
-                                scrape_num: int = 15,
+                                scrape_data_dir: str = "/home/akkara/data/data/scraped_imgs/ovon_15",
                                 topk: int = 1):
         device = text_feats.device
-        B = scrape_num
+        B = self.scrape_num
+
+        print(f"Topk : {topk}")
+        print(f"Scrape Num: {B}")
 
         # 1) SCRAPE & PREPROCESS → a float tensor (B, C, H, W) on `device`
         raw_imgs = load_images(query=text_query, num_images=B, save_dir=scrape_data_dir)
         # raw_imgs: list of np.uint8 H×W×3 BGR arrays
         preprocess = transforms.Compose([
             transforms.ToTensor(),             # → [0,1] RGB, shape (3, H, W)
-            transforms.Resize(1000),            # shorter side → 224
-            transforms.CenterCrop(1000),        # → (3, 224, 224)
+            transforms.Resize(640),            # shorter side → 640
+            transforms.CenterCrop(640),        # → (3, 640, 640)
         ])
         imgs_t = torch.stack([ preprocess(img[..., ::-1]) for img in raw_imgs ], dim=0)
-        # imgs_t = imgs_t.to(device)             # (B, 3, 224, 224)
+        # imgs_t = imgs_t.to(device)             # (B, 3, 640, 640)
+
+        imgs_t = (imgs_t * 255.0).clamp(0,255)
+        print(f"Image tensor range : min {imgs_t.min()}, max {imgs_t.max()}")
 
         # 2) EXTRACT PATCHED IMAGE FEATURES → (B, C, Hp, Wp) e.g. (15, 768, 24, 24)
         scraped_patch_feats = self.get_image_features(imgs_t.cpu().numpy()).to(device = device)
@@ -217,12 +160,14 @@ class ClipModel(torch.nn.Module, BaseModel):
         # 7) POOL & CONCAT TEXT VECTOR → (B+1, C)
         scraped_img_feats = selected.mean(dim=1)                    # (B, C)   
         scraped_img_feats = F.normalize(scraped_img_feats, dim=1)   # (B, C)
-        # print(scraped_img_feats.shape)
+
+        # scraped_img_feats = scraped_img_feats.mean(dim=0, keepdim=True)     #(1, C). First take the mean of the image features
+        # scraped_img_feats = F.normalize(scraped_img_feats, dim=-1)          #(1, C)
+        # print(f"Alt Mean scraped_img_feats")
                     
         all_feats = torch.cat([scraped_img_feats, text_feats], dim=0)  # (B+1, C)
         all_feats = all_feats.mean(dim=0, keepdim=True)                # (1, C)
         all_feats = F.normalize(all_feats, dim=1)                      # (1, C)
-        # print(all_feats.shape)
 
         return all_feats      #Mean over all image+text embeds
 

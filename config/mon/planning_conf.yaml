@@ -14,4 +14,6 @@ PlanningConf:
   obstcl_kernel_size: 0.5 # [in navigator.py]
   min_goal_dist: 0.7 # [in navigator.py]
 
-  multi_prompt: False #TODO: Added
+  multi_prompt: False #TODO: Added. Enables multi-prompts (image, text)
+  multi_detect: False #TODO: Added. Enables detector with both text and image embeddings
+  scrape_num: 15      #TODO: Added. Number of images to load for context.

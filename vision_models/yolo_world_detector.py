@@ -28,6 +28,7 @@ class YOLOWorldDetector:
 
         if multi_prompt:
             self.model = YOLOWorld_Multi(model_id="yolo_world/l")
+            print("Detector : Multi Mode")
         else:
             self.model = YOLOWorld(model_id="yolo_world/l")
 
@@ -82,13 +83,13 @@ class YOLOWorld_Multi(YOLOWorld):
     def __init__(self, *args, model_id="yolo_world/l", **kwargs):
         super().__init__(*args, model_id=model_id, **kwargs)
 
+        self.scrape_num = 3
     
     def load_image_embeds(self, text: str,
-                            scrape_num = 3,
-                            scrape_data_dir = "/mnt/vlfm_query_embed/data/scraped_imgs/ovon_15"):
+                            scrape_data_dir = "/home/akkara/data/data/scraped_imgs/ovon_15"):
 
         scraped_imgs = load_images(query = text,
-                                num_images = scrape_num,
+                                num_images = self.scrape_num,
                                 save_dir= scrape_data_dir)
 
         image_embeds = self.clip_model.embed_image(scraped_imgs)    #Shape: (3, 512)

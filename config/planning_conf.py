@@ -16,3 +16,5 @@ class PlanningConf:
     obstcl_kernel_size: float
     min_goal_dist: float
     multi_prompt: bool
+    multi_detect: bool
+    scrape_num: int
