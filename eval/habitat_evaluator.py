@@ -73,12 +73,12 @@ from omegaconf import OmegaConf
 #     turn_left = 2
 #     turn_right = 3
 
-# Action_ID_to_str = {
-#     0 : "stop",
-#     1 : "move_forward",
-#     2 : "turn_left",
-#     3 : "turn_right" 
-# }
+Action_ID_to_str = {
+    0 : "stop",
+    1 : "move_forward",
+    2 : "turn_left",
+    3 : "turn_right" 
+}
 
 class Result(enum.Enum):
     SUCCESS = 1
@@ -157,7 +157,7 @@ class HabitatEvaluator:
 
         #TODO Changed
         if self.is_gibson: self.results_path = "/mnt/OneMap/results/gibson"
-        elif self.is_hssd: self.results_path = f"/mnt/OneMap/results/hssd/{config.results_dir}"
+        # elif self.is_hssd: self.results_path = f"/mnt/OneMap/results/hssd/{config.results_dir}"
         elif self.is_trial: self.results_path = "/mnt/OneMap/results/junk"
         elif self.is_personal: self.results_path = f"/mnt/OneMap/results/PersONAL/{config.results_dir}"
         elif "ovon" in self.object_nav_path: self.results_path = config.results_dir
@@ -165,9 +165,13 @@ class HabitatEvaluator:
             self.results_path = config.results_dir
             
         # self.results_path = "/mnt/OneMap/results/gibson" if self.is_gibson else "/mnt/OneMap/results/hm3d"
-
+        
+        self.use_saved_steps = config.use_saved_steps
         self.saved_steps_dir = config.saved_steps_dir
         self.saved_steps = None
+
+        if self.use_saved_steps:
+            assert os.path.exists(self.saved_steps_dir), f"Saved steps dir does not exist: {self.saved_steps_dir}"
 
 
         # if self.log_rerun:                                          #TODO Addd: REMOVE
@@ -195,29 +199,96 @@ class HabitatEvaluator:
         else:
             backend_cfg.scene_dataset_config_file = self.scene_path + "hm3d/hm3d_annotated_basis.scene_dataset_config.json" #TODO: Scene Dataset Config is loaded here
 
-        hfov = 90
-        rgb = habitat_sim.CameraSensorSpec()
-        rgb.uuid = "rgb"
-        rgb.hfov = hfov
-        rgb.position = np.array([0, 0.88, 0])
-        rgb.sensor_type = habitat_sim.SensorType.COLOR
-        res = 640
-        rgb.resolution = [res, res]
 
-        depth = habitat_sim.CameraSensorSpec()
-        depth.uuid = "depth"
-        depth.hfov = hfov
-        depth.sensor_type = habitat_sim.SensorType.DEPTH
-        depth.position = np.array([0, 0.88, 0])
-        depth.resolution = [res, res]
+        #Config for Saved Navigation
+        if (self.use_saved_steps):
+            
+            #Config for Saved Navigation in HM3D (Multi-Floor)
+            if not (self.is_hssd) and not (self.is_gibson):
+                hfov = 90
+                rgb = habitat_sim.CameraSensorSpec()
+                rgb.uuid = "rgb"
+                rgb.hfov = hfov
+                rgb.position = np.array([0, 1.1, 0])                    #Changed: 0.88 -> 1.1
+                rgb.sensor_type = habitat_sim.SensorType.COLOR
+                res = 640
+                rgb.resolution = [res, res]
 
-        agent_cfg = habitat_sim.agent.AgentConfiguration(action_space=dict(
-            move_forward=ActionSpec("move_forward", ActuationSpec(amount=0.25)),
-            # turn_left=ActionSpec("turn_left", ActuationSpec(amount=30.0)),          #TODO Changed: turn_left and turn_right
-            # turn_right=ActionSpec("turn_right", ActuationSpec(amount=30.0)),
-            turn_left=ActionSpec("turn_left", ActuationSpec(amount=5.0)),
-            turn_right=ActionSpec("turn_right", ActuationSpec(amount=5.0)),
-        ))
+                depth = habitat_sim.CameraSensorSpec()
+                depth.uuid = "depth"
+                depth.hfov = hfov
+                depth.sensor_type = habitat_sim.SensorType.DEPTH
+                depth.position = np.array([0, 1.1, 0])                    #Changed: 0.88 -> 1.1
+                depth.resolution = [res, res]
+
+                agent_cfg = habitat_sim.agent.AgentConfiguration(
+                    height = 1.1,
+                    radius = 0.08,
+                    action_space=dict(
+                        move_forward=ActionSpec("move_forward", ActuationSpec(amount=0.25)),
+                        turn_left=ActionSpec("turn_left", ActuationSpec(amount=20.0)),              #Changed: 5 -> 20
+                        turn_right=ActionSpec("turn_right", ActuationSpec(amount=20.0)),            #Changed: 5 -> 20
+                    )
+                )
+
+            #Config for Saved Navigation in HSSD (Overmapped)
+            elif self.is_hssd:
+                hfov = 90
+                rgb = habitat_sim.CameraSensorSpec()
+                rgb.uuid = "rgb"
+                rgb.hfov = hfov
+                rgb.position = np.array([0, 0.88, 0])
+                rgb.sensor_type = habitat_sim.SensorType.COLOR
+                res = 640
+                rgb.resolution = [res, res]
+
+                depth = habitat_sim.CameraSensorSpec()
+                depth.uuid = "depth"
+                depth.hfov = hfov
+                depth.sensor_type = habitat_sim.SensorType.DEPTH
+                depth.position = np.array([0, 0.88, 0])
+                depth.resolution = [res, res]
+
+                agent_cfg = habitat_sim.agent.AgentConfiguration(
+                    height = 1.1,
+                    radius = 0.08,
+                    action_space=dict(
+                        move_forward=ActionSpec("move_forward", ActuationSpec(amount=0.25)),
+                        turn_left=ActionSpec("turn_left", ActuationSpec(amount=30.0)),              #Changed: 5 -> 30
+                        turn_right=ActionSpec("turn_right", ActuationSpec(amount=30.0)),            #Changed: 5 -> 30
+                    )
+                )
+
+
+            else:
+                pass
+
+        
+        else:
+            #OG Config
+            hfov = 90
+            rgb = habitat_sim.CameraSensorSpec()
+            rgb.uuid = "rgb"
+            rgb.hfov = hfov
+            rgb.position = np.array([0, 0.88, 0])
+            rgb.sensor_type = habitat_sim.SensorType.COLOR
+            res = 640
+            rgb.resolution = [res, res]
+
+            depth = habitat_sim.CameraSensorSpec()
+            depth.uuid = "depth"
+            depth.hfov = hfov
+            depth.sensor_type = habitat_sim.SensorType.DEPTH
+            depth.position = np.array([0, 0.88, 0])
+            depth.resolution = [res, res]
+
+            agent_cfg = habitat_sim.agent.AgentConfiguration(action_space=dict(
+                move_forward=ActionSpec("move_forward", ActuationSpec(amount=0.25)),
+                turn_left=ActionSpec("turn_left", ActuationSpec(amount=5.0)),
+                turn_right=ActionSpec("turn_right", ActuationSpec(amount=5.0)),
+            ))
+
+    
         agent_cfg.sensor_specifications = [rgb, depth]
         sim_cfg = habitat_sim.Configuration(backend_cfg, [agent_cfg])
         print_hab_cfg(sim_cfg)
@@ -390,7 +461,6 @@ class HabitatEvaluator:
         ####
         results_dir = os.path.join(self.results_path, "state")
         os.makedirs(results_dir, exist_ok=True)
-
         
 
         #get_scene_eps = lambda f: (f.split("_")[1], int(f.split("_")[2].split(".")[0]))
@@ -499,44 +569,45 @@ class HabitatEvaluator:
 
             #####
             #TODO Changed: Make sure that saved steps file exists for this scene and starting pose
-            # scene_path = episode.scene_id
-            # scene_id = scene_path.split("/")[-1].split(".")[0]
-            # episode_id = episode.episode_id
-            # start_pos, start_rot = episode.start_position, episode.start_rotation
+            if self.use_saved_steps:
+                scene_path = episode.scene_id
+                scene_id = scene_path.split("/")[-1].split(".")[0]
+                episode_id = episode.episode_id
+                start_pos, start_rot = episode.start_position, episode.start_rotation
 
-            # print(f"\nNew Scene or Episode!\nScene ID: {scene_id}, Episode ID: {episode_id}, start_pos: {start_pos}, start_rot: {start_rot}")
+                print(f"\nNew Scene or Episode!\nScene ID: {scene_id}, Episode ID: {episode_id}, start_pos: {start_pos}, start_rot: {start_rot}")
 
-            # scene_steps_files = [file for file in os.listdir(self.saved_steps_dir) if file.__contains__(scene_id)]
-            # print(f"Scene Step Files: {len(scene_steps_files)}")
-            # if len(scene_steps_files) == 0: 
-            #     print(f"No Files Found! Skipping...")
-            #     continue
+                scene_steps_files = [file for file in os.listdir(self.saved_steps_dir) if file.__contains__(scene_id)]
+                print(f"Scene Step Files: {len(scene_steps_files)}")
+                if len(scene_steps_files) == 0: 
+                    print(f"No Files Found! Skipping...")
+                    continue
 
-            # for file in scene_steps_files:
+                for file in scene_steps_files:
 
-            #     file_path = os.path.join(self.saved_steps_dir, file)
-            #     step_actions = dict(np.load(file_path, allow_pickle=True))
-            #     print(f"Saved Start Pos: {step_actions['init_pos_abs']}, Saved Start Rot: {step_actions['init_rot_abs']}")
-            #     if (step_actions["init_pos_abs"] == start_pos).all() and (step_actions["init_rot_abs"] == start_rot).all():
+                    file_path = os.path.join(self.saved_steps_dir, file)
+                    step_actions = dict(np.load(file_path, allow_pickle=True))
+                    print(f"Saved Start Pos: {step_actions['init_pos_abs']}, Saved Start Rot: {step_actions['init_rot_abs']}")
+                    if (step_actions["init_pos_abs"] == start_pos).all() and (step_actions["init_rot_abs"] == start_rot).all():
 
-            #         del step_actions['init_pos_abs']
-            #         del step_actions['init_rot_abs']
-            #         del step_actions['scene']
-            #         del step_actions['episode']
+                        del step_actions['init_pos_abs']
+                        del step_actions['init_rot_abs']
+                        del step_actions['scene']
+                        del step_actions['episode']
 
-            #         # step_actions = {int(k):torch.Tensor(v).to(dtype=torch.int64) for (k, v) in step_actions.items()}
-            #         # step_actions = {int(k): int(v[0][0]) for (k, v) in step_actions.items()}
-            #         step_actions = {int(k): Action_ID_to_str[ v[0][0] ] for (k, v) in step_actions.items()}
+                        # step_actions = {int(k):torch.Tensor(v).to(dtype=torch.int64) for (k, v) in step_actions.items()}
+                        # step_actions = {int(k): int(v[0][0]) for (k, v) in step_actions.items()}
+                        step_actions = {int(k): Action_ID_to_str[ v[0][0] ] for (k, v) in step_actions.items()}
 
-            #         print(f"Found Saved Steps for Scene : {scene_id}")
-            #         skip_episode = False
-            #         break
-            #     else:
-            #         skip_episode = True
+                        print(f"Found Saved Steps for Scene : {scene_id}")
+                        skip_episode = False
+                        break
+                    else:
+                        skip_episode = True
 
-            # if skip_episode: 
-            #     print(f"Saved Step Actions not found for Scene: {scene_id}, Episode: {episode_id}. Skipping... ")
-            #     continue
+                if skip_episode: 
+                    print(f"Saved Step Actions not found for Scene: {scene_id}, Episode: {episode_id}. Skipping... ")
+                    continue
 
             #####
 
@@ -626,10 +697,13 @@ class HabitatEvaluator:
 
                 #TODO Changed: Action from saved steps actions
                 ####
-                # action = {}
-                # saved_action = step_actions[steps]
-                # if saved_action == "stop": break
-                # else: action["discrete"] = saved_action
+                if self.use_saved_steps:
+                    action = {}
+                    saved_action = step_actions[steps]
+                    if saved_action == "stop": 
+                        break
+                    else: 
+                        action["discrete"] = saved_action
                 ####
                 
                 self.execute_action(action)
@@ -762,14 +836,15 @@ class HabitatEvaluator:
 
             #TODO Changed: Save Feature Map
             ####
-            # save_embed_path = f"{self.results_path}/feature_maps/feature_map_scene_{scene_id}.npz"
-            # os.makedirs(os.path.dirname(save_embed_path), exist_ok = True)
+            if self.use_saved_steps:
+                save_embed_path = f"{self.results_path}/feature_maps/feature_map_scene_{scene_id}.npz"
+                os.makedirs(os.path.dirname(save_embed_path), exist_ok = True)
 
-            # if os.path.exists(save_embed_path):
-            #     print(f"Saved Feature Map found at : {save_embed_path}")
-            # else:
-            #     np.savez(save_embed_path, arr=self.actor.mapper.one_map.feature_map)
-            #     print(f"Saved Feature Map to : {save_embed_path}")
+                if os.path.exists(save_embed_path):
+                    print(f"Saved Feature Map found at : {save_embed_path}")
+                else:
+                    np.savez(save_embed_path, arr=self.actor.mapper.one_map.feature_map)
+                    print(f"Saved Feature Map to : {save_embed_path}")
             ####
 
 

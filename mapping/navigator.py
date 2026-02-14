@@ -193,6 +193,7 @@ class Navigator:
         #TODO: Added. Check for text-based or multi-based similarity generation
         self.multi_prompt = config.planner.multi_prompt
         self.query_multi_features = None
+        self.use_step_actions = config.use_saved_steps
 
         # For the closed-vocabulary object detector, not needed for OneMap
         self.class_map = {}
@@ -558,8 +559,8 @@ class Navigator:
             self.one_map.checked_conf_map[px - 10:px + 10, py - 10:py + 10] += 10
             self.first_obs = False
 
-
-        #return False    #TODO Changed: No detections or other non-relevant code is run. This ensures only the feature map is updated
+        if self.use_saved_steps:    #TODO Added: No detections or other non-relevant code is run. This ensures only the feature map is updated
+            return False    
     
         # if detections.class_id.shape[0] > 0:
         last_saw_left = self.saw_left

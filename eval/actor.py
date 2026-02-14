@@ -55,8 +55,13 @@ class MONActor(Actor):
 
         self.mapper = Navigator(model, detector, config)
 
-        self.init = 36*2   #Default: The agent initializes by turning 360 degrees
-        # self.init = -1   #TODO Changed : Used when the agent does not need to turn to initialize. Used when mapping the scene.
+        self.use_saved_steps = config.use_saved_steps       #TODO Added
+        if self.use_saved_steps:
+            self.init = -1              #TODO Added : Used when the agent does not need to turn to initialize. Used when mapping the scene.
+        else:
+            self.init = 36*2            #Default: The agent initializes by turning 360 degrees
+
+        # self.init = 36*2   
 
         hfov = 90 if self.square else 97
         res_x = 640
@@ -99,7 +104,8 @@ class MONActor(Actor):
                              transformation_matrix)
 
         #TODO Changed: Return Buffer action
-        # return -1, False
+        if self.use_saved_steps:
+            return -1, False
 
 
         if self.init > 0:

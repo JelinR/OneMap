@@ -66,7 +66,7 @@ def load_hm3d_episodes(episodes: List[Episode], scene_data: Dict[str, SceneData]
                 #Define episodes for Scene: Each episode corresponds to a goal object category, start position and rotation
                 for ep in json_data['episodes']:
                     episode = Episode(ep['scene_id'],
-                                      i,
+                                      ep["episode_id"],    #   i,  #TODO Changed: i -> ep["episode_id"]
                                       ep['start_position'],
                                       ep['start_rotation'],
                                       [ep['object_category']],

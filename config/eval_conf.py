@@ -21,6 +21,7 @@ class EvalConf:
     use_pointnav: bool
     square_im: bool
 
+    use_saved_steps: bool   #TODO Added
     saved_steps_dir: str    #TODO Changed: Directory for saved steps navigation
     results_dir: str
     run_split: int
